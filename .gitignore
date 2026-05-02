@@ -1,0 +1,25 @@
+# Reference code (separate git repo) — keep out of workspace git
+DB_project/
+
+# Java / Spring Boot
+target/
+build/
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+.idea/
+.vscode/
+.gradle/
+hs_err_pid*
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Env / secrets
+.env
+.env.local
+application-local.properties
+application-local.yml

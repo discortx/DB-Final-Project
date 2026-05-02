@@ -114,6 +114,7 @@ A web-based, PostgreSQL-backed reimplementation of the existing console + Swing 
 | Keep all three games (Hangman, Snake, online TTT) | Explicit user choice; online TTT in particular exercises invite + match-state tables for SQL demo | ⚠️ Revisit — porting all three games is the largest scope risk in the timeline |
 | Form login + BCrypt | Standard Spring Security default; sufficient for an academic demo without OAuth complexity | — Pending |
 | Build the schema fresh, do not migrate existing file-tree data | Migration is a different project; the existing data is throwaway test content | — Pending |
+| New Spring Boot app lives in `./app/` at workspace root; `DB_project/` stays untouched as reference (its own git repo) | Cleanest separation between reference codebase and new build; lets the report cite the old design without fear of breaking it | — Pending |
 
 ## Evolution
 
