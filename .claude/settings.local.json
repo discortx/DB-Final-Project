@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(gsd-new-project)",
+      "Skill(gsd-new-project:*)",
+      "PowerShell(gsd-sdk query init.new-project)",
+      "PowerShell(npx --version)",
+      "PowerShell(npx.cmd --version)",
+      "PowerShell(npx.cmd --no-install gsd-sdk query init.new-project 2>&1)",
+      "PowerShell(Get-ChildItem -Path \"$env:USERPROFILE\\\\.claude\\\\get-shit-done\\\\bin\" -ErrorAction SilentlyContinue)",
+      "PowerShell(node \"$env:USERPROFILE\\\\.claude\\\\get-shit-done\\\\bin\\\\gsd-tools.cjs\" --help 2>&1 | Select-Object -First 40)",
+      "PowerShell(node \"$env:USERPROFILE\\\\.claude\\\\get-shit-done\\\\bin\\\\gsd-tools.cjs\" init 2>&1 | Select-Object -First 100)"
+    ]
+  }
+}
