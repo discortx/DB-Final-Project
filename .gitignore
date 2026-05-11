@@ -21,5 +21,7 @@ Thumbs.db
 # Env / secrets
 .env
 .env.local
+server/.env
+client/.env.local
 application-local.properties
 application-local.yml

@@ -9,7 +9,23 @@
       "PowerShell(npx.cmd --no-install gsd-sdk query init.new-project 2>&1)",
       "PowerShell(Get-ChildItem -Path \"$env:USERPROFILE\\\\.claude\\\\get-shit-done\\\\bin\" -ErrorAction SilentlyContinue)",
       "PowerShell(node \"$env:USERPROFILE\\\\.claude\\\\get-shit-done\\\\bin\\\\gsd-tools.cjs\" --help 2>&1 | Select-Object -First 40)",
-      "PowerShell(node \"$env:USERPROFILE\\\\.claude\\\\get-shit-done\\\\bin\\\\gsd-tools.cjs\" init 2>&1 | Select-Object -First 100)"
+      "PowerShell(node \"$env:USERPROFILE\\\\.claude\\\\get-shit-done\\\\bin\\\\gsd-tools.cjs\" init 2>&1 | Select-Object -First 100)",
+      "Bash(npm init *)",
+      "Bash(npm install *)",
+      "Bash(node -e \"const b=require\\('bcrypt'\\); Promise.all\\(['Password1!','Password1!','Password1!','Password1!'].map\\(p=>b.hash\\(p,12\\)\\)\\).then\\(hs=>hs.forEach\\(h=>console.log\\(h\\)\\)\\)\")",
+      "Bash(node --check app.js)",
+      "Bash(node --check server.js)",
+      "Bash(node --check routes/auth.js)",
+      "Bash(node --check routes/users.js)",
+      "Bash(node --check routes/friends.js)",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); const app = require\\('./app'\\); console.log\\('app loaded OK'\\)\")",
+      "Bash(npm create *)",
+      "Bash(npx tailwindcss *)",
+      "Bash(npm run *)",
+      "Bash(node -e ' *)",
+      "Bash(Resolve-DnsName \"db.sfslzuzdhvmivksekklz.supabase.co\")",
+      "Bash(Select-Object -First 5)",
+      "Bash(nslookup db.sfslzuzdhvmivksekklz.supabase.co)"
     ]
   }
 }
