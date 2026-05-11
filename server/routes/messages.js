@@ -53,14 +53,15 @@ router.post(
       `SELECT user_id FROM chat_members WHERE chat_id = $1 AND user_id <> $2`,
       [req.params.chatId, req.user.id]
     );
+    const io = getIo();
     for (const { user_id } of members) {
-      await pool.query(
-        `INSERT INTO notifications (recipient_id, sender_id, type, text) VALUES ($1, $2, 'MESSAGE', $3)`,
+      const { rows: [notif] } = await pool.query(
+        `INSERT INTO notifications (recipient_id, sender_id, type, text) VALUES ($1, $2, 'MESSAGE', $3) RETURNING *`,
         [user_id, req.user.id, `${req.user.username} sent you a message.`]
       );
+      if (io) io.to(`user:${user_id}`).emit('notification:new', notif);
     }
 
-    const io = getIo();
     if (io) io.to(`chat:${req.params.chatId}`).emit('chat:message', msg);
 
     res.status(201).json(msg);

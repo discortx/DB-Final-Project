@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getMatch, makeMove, rematch } from '../api/games';
 import useAuthStore from '../store/authStore';
+import socket from '../socket';
 
 const WINS = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
@@ -23,8 +24,12 @@ export default function TicTacToePage() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 2000);
-    return () => clearInterval(t);
+    const onMove = (updated) => {
+      if (String(updated.id) !== String(id)) return;
+      setMatch(updated);
+    };
+    socket.on('game:move', onMove);
+    return () => socket.off('game:move', onMove);
   }, [id]);
 
   const handleMove = async (pos) => {

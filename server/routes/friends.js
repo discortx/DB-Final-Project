@@ -1,8 +1,9 @@
-const express  = require('express');
-const { z }    = require('zod');
-const pool     = require('../db/pool');
-const auth     = require('../middleware/auth');
-const validate = require('../middleware/validate');
+const express   = require('express');
+const { z }     = require('zod');
+const pool      = require('../db/pool');
+const auth      = require('../middleware/auth');
+const validate  = require('../middleware/validate');
+const { getIo } = require('../sockets');
 
 const router = express.Router();
 
@@ -81,11 +82,13 @@ router.post(
     );
 
     if (rows[0]) {
-      await pool.query(
+      const { rows: [notif] } = await pool.query(
         `INSERT INTO notifications (recipient_id, sender_id, type, text)
-         VALUES ($1, $2, 'FRIEND_REQUEST', $3)`,
+         VALUES ($1, $2, 'FRIEND_REQUEST', $3) RETURNING *`,
         [receiver_id, req.user.id, `${req.user.username} sent you a friend request.`]
       );
+      const io = getIo();
+      if (io) io.to(`user:${receiver_id}`).emit('notification:new', notif);
     }
 
     res.status(201).json(rows[0] || { message: 'Request already sent' });

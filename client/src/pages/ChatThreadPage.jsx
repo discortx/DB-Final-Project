@@ -5,6 +5,7 @@ import { getMessages, sendMessage } from '../api/messages';
 import { searchUsers } from '../api/users';
 import useAuthStore from '../store/authStore';
 import Avatar from '../components/Avatar';
+import socket from '../socket';
 
 function timeStr(dateStr) {
   return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -27,13 +28,14 @@ export default function ChatThreadPage() {
   useEffect(() => {
     getChat(id).then((r) => setChat(r.data));
     getMessages(id).then((r) => { setMessages(r.data); setTimeout(scrollToBottom, 50); });
-    const interval = setInterval(async () => {
-      try {
-        const r = await getMessages(id);
-        setMessages(r.data);
-      } catch {}
-    }, 3000);
-    return () => clearInterval(interval);
+
+    socket.emit('chat:join', id);
+    const onMessage = (msg) => {
+      if (String(msg.chat_id) !== String(id)) return;
+      setMessages((m) => m.some((x) => x.id === msg.id) ? m : [...m, msg]);
+    };
+    socket.on('chat:message', onMessage);
+    return () => socket.off('chat:message', onMessage);
   }, [id]);
 
   useEffect(() => { scrollToBottom(); }, [messages.length]);

@@ -22,6 +22,12 @@ export default function Layout() {
     return () => clearInterval(t);
   }, []);
 
+  useEffect(() => {
+    const onNotification = () => setUnread((n) => n + 1);
+    socket.on('notification:new', onNotification);
+    return () => socket.off('notification:new', onNotification);
+  }, []);
+
   const handleLogout = async () => {
     try { await apiLogout(); } catch {}
     socket.disconnect();

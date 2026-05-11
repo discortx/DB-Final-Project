@@ -39,10 +39,12 @@ router.post(
       `INSERT INTO game_invites (sender_id, receiver_id, game_type) VALUES ($1, $2, 'tictactoe') RETURNING *`,
       [req.user.id, req.body.receiver_id]
     );
-    await pool.query(
-      `INSERT INTO notifications (recipient_id, sender_id, type, text) VALUES ($1, $2, 'GAME', $3)`,
+    const { rows: [notif] } = await pool.query(
+      `INSERT INTO notifications (recipient_id, sender_id, type, text) VALUES ($1, $2, 'GAME', $3) RETURNING *`,
       [req.body.receiver_id, req.user.id, `${req.user.username} invited you to play TicTacToe.`]
     );
+    const io = getIo();
+    if (io) io.to(`user:${req.body.receiver_id}`).emit('notification:new', notif);
     res.status(201).json(rows[0]);
   }
 );

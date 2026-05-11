@@ -1,8 +1,9 @@
-const express  = require('express');
-const { z }    = require('zod');
-const pool     = require('../db/pool');
-const auth     = require('../middleware/auth');
-const validate = require('../middleware/validate');
+const express   = require('express');
+const { z }     = require('zod');
+const pool      = require('../db/pool');
+const auth      = require('../middleware/auth');
+const validate  = require('../middleware/validate');
+const { getIo } = require('../sockets');
 
 const router = express.Router();
 
@@ -71,12 +72,14 @@ router.post('/', auth, validate(createPostSchema), async (req, res) => {
       );
     }
 
+    const io = getIo();
     for (const uid of tagged_user_ids) {
       if (uid !== req.user.id) {
-        await client.query(
-          `INSERT INTO notifications (recipient_id, sender_id, type, text) VALUES ($1, $2, 'TAG', $3)`,
+        const { rows: [notif] } = await client.query(
+          `INSERT INTO notifications (recipient_id, sender_id, type, text) VALUES ($1, $2, 'TAG', $3) RETURNING *`,
           [uid, req.user.id, `${req.user.username} tagged you in a post.`]
         );
+        if (io) io.to(`user:${uid}`).emit('notification:new', notif);
       }
     }
 
@@ -165,10 +168,12 @@ router.post('/:id/like', auth, async (req, res) => {
     );
     const { rows } = await client.query(`SELECT author_id FROM posts WHERE id = $1`, [req.params.id]);
     if (rows[0] && rows[0].author_id !== req.user.id) {
-      await client.query(
-        `INSERT INTO notifications (recipient_id, sender_id, type, text) VALUES ($1, $2, 'LIKE', $3)`,
+      const { rows: [notif] } = await client.query(
+        `INSERT INTO notifications (recipient_id, sender_id, type, text) VALUES ($1, $2, 'LIKE', $3) RETURNING *`,
         [rows[0].author_id, req.user.id, `${req.user.username} liked your post.`]
       );
+      const io = getIo();
+      if (io) io.to(`user:${rows[0].author_id}`).emit('notification:new', notif);
     }
     await client.query('COMMIT');
     res.json({ ok: true });
@@ -201,10 +206,12 @@ router.post(
       );
       const { rows: postRows } = await client.query(`SELECT author_id FROM posts WHERE id = $1`, [req.params.id]);
       if (postRows[0] && postRows[0].author_id !== req.user.id) {
-        await client.query(
-          `INSERT INTO notifications (recipient_id, sender_id, type, text) VALUES ($1, $2, 'COMMENT', $3)`,
+        const { rows: [notif] } = await client.query(
+          `INSERT INTO notifications (recipient_id, sender_id, type, text) VALUES ($1, $2, 'COMMENT', $3) RETURNING *`,
           [postRows[0].author_id, req.user.id, `${req.user.username} commented on your post.`]
         );
+        const io = getIo();
+        if (io) io.to(`user:${postRows[0].author_id}`).emit('notification:new', notif);
       }
       await client.query('COMMIT');
       res.status(201).json(rows[0]);
