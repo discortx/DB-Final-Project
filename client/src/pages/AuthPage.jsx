@@ -587,14 +587,14 @@ export default function AuthPage({ mode }) {
   const isLogin = mode === 'login';
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel — hidden on mobile */}
-      <div className="hidden md:flex w-1/2 min-h-screen bg-[#0A0A0A] text-white flex-col p-8">
+    <div className="h-screen overflow-hidden flex">
+      {/* Left panel — fixed to viewport height, never scrolls */}
+      <div className="hidden md:flex w-1/2 h-screen bg-[#0A0A0A] text-white flex-col p-8 overflow-hidden">
         {/* Logo */}
-        <div className="font-black text-2xl tracking-[-0.04em]">NEXUS</div>
+        <div className="font-black text-2xl tracking-[-0.04em] shrink-0">NEXUS</div>
 
-        {/* Center taglines */}
-        <div className="flex-1 flex items-center">
+        {/* Center taglines — flex-1 keeps this region vertically centered */}
+        <div className="flex-1 flex items-center min-h-0">
           <div>
             <p className="font-black text-5xl leading-tight">Connect.</p>
             <p className="font-black text-5xl leading-tight">Share.</p>
@@ -602,8 +602,8 @@ export default function AuthPage({ mode }) {
           </div>
         </div>
 
-        {/* Feature bullets */}
-        <div className="flex flex-col gap-3 mt-8">
+        {/* Feature bullets — shrink-0 pins them to the bottom, never pushed off-screen */}
+        <div className="shrink-0 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-sm text-[#888888]">
             <Users size={16} />
             Friend graph with smart suggestions
@@ -619,9 +619,12 @@ export default function AuthPage({ mode }) {
         </div>
       </div>
 
-      {/* Right panel */}
-      <div className="flex-1 md:w-1/2 flex justify-center min-h-screen bg-white overflow-y-auto">
-        <div className="max-w-sm w-full mx-auto px-8 py-12 self-start">
+      {/* Right panel — only this region scrolls; gutter reserved to prevent layout shift */}
+      <div
+        className="flex-1 md:w-1/2 h-screen overflow-y-auto bg-white"
+        style={{ scrollbarGutter: 'stable' }}
+      >
+        <div className="max-w-sm w-full mx-auto px-8 py-12">
           {/* Tab switcher */}
           <div className="flex gap-6 mb-8">
             <Link
