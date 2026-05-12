@@ -268,24 +268,53 @@ function RegisterForm() {
   const [gender, setGender] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [touched, setTouched] = useState({
+    firstName: false,
+    lastName: false,
+    username: false,
+    email: false,
+    password: false,
+  });
 
-  const usernameError = validateUsername(username);
-  const usernameValid = username.length > 0 && usernameError === '';
+  const touch = (field) => setTouched((t) => ({ ...t, [field]: true }));
+
+  const firstNameError =
+    touched.firstName && !firstName.trim() ? 'First name is required.' : '';
+  const lastNameError =
+    touched.lastName && !lastName.trim() ? 'Last name is required.' : '';
+  const usernameValidationError = validateUsername(username);
+  const usernameError =
+    touched.username && usernameValidationError ? usernameValidationError : '';
+  const usernameValid = username.length > 0 && !usernameValidationError;
+  const emailError =
+    touched.email && !EMAIL_RE.test(email.trim())
+      ? 'Enter a valid email address.'
+      : '';
+  const passwordError =
+    touched.password && password.length < 8
+      ? 'Password must be at least 8 characters.'
+      : '';
+
+  const canSubmit =
+    firstName.trim() &&
+    lastName.trim() &&
+    usernameValid &&
+    EMAIL_RE.test(email.trim()) &&
+    password.length >= 8 &&
+    !loading;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (usernameError) {
-      setError('Please fix the username field.');
-      return;
-    }
+    setTouched({ firstName: true, lastName: true, username: true, email: true, password: true });
+    if (!canSubmit) return;
     setError('');
     setLoading(true);
     try {
       const payload = {
-        first_name: firstName,
-        last_name: lastName,
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
         username,
-        email,
+        email: email.trim(),
         password,
       };
       if (dob) payload.date_of_birth = dob;
@@ -304,153 +333,252 @@ function RegisterForm() {
     }
   };
 
+  const fieldCls = (hasError) =>
+    `w-full bg-white rounded-md px-3 py-2.5 text-sm placeholder:text-[#888888] focus:outline-none transition-colors border ${
+      hasError
+        ? 'border-[#CC0000] focus:ring-1 focus:ring-[#CC0000] focus:border-[#CC0000]'
+        : 'border-[#E0E0E0] focus:border-black focus:ring-1 focus:ring-black'
+    }`;
+
+  const labelCls = 'block text-xs font-semibold uppercase tracking-widest text-[#404040] mb-2';
+
+  const InlineError = ({ id, msg }) =>
+    msg ? (
+      <p id={id} className="text-xs text-[#CC0000] mt-1.5 flex items-center gap-1">
+        <AlertCircle size={12} className="shrink-0" />
+        {msg}
+      </p>
+    ) : null;
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-[#0A0A0A] mb-1">Create your account.</h1>
-        <p className="text-sm text-[#888888] mb-6">Fill in your details to get started.</p>
-      </div>
+    <>
+      <style>{`
+        @keyframes reg-rise {
+          0%   { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .reg-rise   { animation: reg-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .reg-rise-1 { animation-delay: 0.04s; }
+        .reg-rise-2 { animation-delay: 0.09s; }
+        .reg-rise-3 { animation-delay: 0.14s; }
+        .reg-rise-4 { animation-delay: 0.19s; }
+        .reg-rise-5 { animation-delay: 0.24s; }
+        .reg-rise-6 { animation-delay: 0.29s; }
+        .reg-rise-7 { animation-delay: 0.34s; }
+        .reg-rise-8 { animation-delay: 0.39s; }
+      `}</style>
 
-      {/* Name row */}
-      <div className="grid grid-cols-2 gap-3">
-        <Input
-          label="First name"
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-          required
-          placeholder="Jane"
-        />
-        <Input
-          label="Last name"
-          value={lastName}
-          onChange={(e) => setLastName(e.target.value)}
-          required
-          placeholder="Smith"
-        />
-      </div>
+      <div className="bg-white border border-[#E0E0E0] rounded-lg p-8 shadow-[0_1px_4px_rgba(0,0,0,0.08)] reg-rise">
+        <div className="mb-7 reg-rise reg-rise-1">
+          <h1 className="text-3xl font-bold tracking-tight text-[#0A0A0A] mb-1.5 leading-tight">
+            Create your account.
+          </h1>
+          <p className="text-sm text-[#888888]">
+            Fill in your details to get started.
+          </p>
+        </div>
 
-      {/* Username with live validation */}
-      <div className="w-full">
-        <label className="text-xs font-semibold text-[#404040] mb-0.5 block">
-          Username
-          <span className="ml-1 text-[10px] text-[#888888] font-normal normal-case tracking-normal">
-            8–12 characters
-          </span>
-        </label>
-        <div className="relative">
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-            minLength={8}
-            maxLength={12}
-            placeholder="cooluser99"
-            className={`w-full border bg-white rounded-md px-3 py-2 text-sm placeholder:text-[#888888] focus:outline-none transition-colors pr-9 ${
-              username.length === 0
-                ? 'border-[#E0E0E0] focus:border-black focus:ring-1 focus:ring-black'
-                : usernameValid
-                ? 'border-[#1A7A4A] ring-1 ring-[#1A7A4A] focus:outline-none'
-                : 'border-[#CC0000] ring-1 ring-[#CC0000] focus:outline-none'
-            }`}
-          />
-          {username.length > 0 && (
-            <span className="absolute right-3 top-1/2 -translate-y-1/2">
-              {usernameValid ? (
-                <CheckCircle2 size={16} className="text-[#1A7A4A]" />
-              ) : (
-                <XCircle size={16} className="text-[#CC0000]" />
+        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+
+          {/* Name row */}
+          <div className="grid grid-cols-2 gap-3 reg-rise reg-rise-2">
+            <div>
+              <label htmlFor="reg-first" className={labelCls}>First name</label>
+              <input
+                id="reg-first"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                onBlur={() => touch('firstName')}
+                placeholder="Jane"
+                aria-invalid={!!firstNameError}
+                className={fieldCls(!!firstNameError)}
+              />
+              <InlineError id="reg-first-error" msg={firstNameError} />
+            </div>
+            <div>
+              <label htmlFor="reg-last" className={labelCls}>Last name</label>
+              <input
+                id="reg-last"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                onBlur={() => touch('lastName')}
+                placeholder="Smith"
+                aria-invalid={!!lastNameError}
+                className={fieldCls(!!lastNameError)}
+              />
+              <InlineError id="reg-last-error" msg={lastNameError} />
+            </div>
+          </div>
+
+          {/* Username */}
+          <div className="reg-rise reg-rise-3">
+            <label htmlFor="reg-username" className={labelCls}>
+              Username{' '}
+              <span className="normal-case tracking-normal font-normal text-[#888888]">
+                (8–12 chars)
+              </span>
+            </label>
+            <div className="relative">
+              <input
+                id="reg-username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                onBlur={() => touch('username')}
+                minLength={8}
+                maxLength={12}
+                placeholder="cooluser99"
+                aria-invalid={!!usernameError}
+                className={`${fieldCls(!!usernameError)} pr-9 ${
+                  username.length > 0 && usernameValid
+                    ? '!border-[#1A7A4A] !ring-1 !ring-[#1A7A4A]'
+                    : ''
+                }`}
+              />
+              {username.length > 0 && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {usernameValid ? (
+                    <CheckCircle2 size={16} className="text-[#1A7A4A]" />
+                  ) : (
+                    <XCircle size={16} className="text-[#CC0000]" />
+                  )}
+                </span>
               )}
-            </span>
-          )}
-        </div>
-        {username.length > 0 && usernameError && (
-          <p className="text-xs text-[#CC0000] mt-1">{usernameError}</p>
-        )}
-      </div>
+            </div>
+            <InlineError id="reg-username-error" msg={usernameError} />
+          </div>
 
-      <Input
-        label="Email"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-        placeholder="you@example.com"
-      />
+          {/* Email */}
+          <div className="reg-rise reg-rise-4">
+            <label htmlFor="reg-email" className={labelCls}>Email</label>
+            <input
+              id="reg-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => touch('email')}
+              autoComplete="email"
+              placeholder="you@example.com"
+              aria-invalid={!!emailError}
+              className={fieldCls(!!emailError)}
+            />
+            <InlineError id="reg-email-error" msg={emailError} />
+          </div>
 
-      {/* Password with strength bar */}
-      <div className="w-full">
-        <label className="text-xs font-semibold text-[#404040] mb-1 block">Password</label>
-        <div className="relative">
-          <input
-            type={showPassword ? 'text' : 'password'}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            placeholder="••••••••"
-            className="w-full border border-[#E0E0E0] bg-white rounded-md px-3 py-2 text-sm placeholder:text-[#888888] focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors pr-10"
-          />
-          <button
-            type="button"
-            tabIndex={-1}
-            onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] hover:text-[#0A0A0A] transition-colors"
-          >
-            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-        </div>
-        {password.length > 0 && <PasswordStrengthBar password={password} />}
-      </div>
+          {/* Password + strength bar */}
+          <div className="reg-rise reg-rise-5">
+            <label htmlFor="reg-password" className={labelCls}>Password</label>
+            <div className="relative">
+              <input
+                id="reg-password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => touch('password')}
+                autoComplete="new-password"
+                minLength={8}
+                placeholder="••••••••"
+                aria-invalid={!!passwordError}
+                className={`${fieldCls(!!passwordError)} pr-10`}
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] hover:text-[#0A0A0A] transition-colors duration-150"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {password.length > 0 && <PasswordStrengthBar password={password} />}
+            <InlineError id="reg-password-error" msg={passwordError} />
+          </div>
 
-      <Input
-        label="Date of birth (optional)"
-        type="date"
-        value={dob}
-        onChange={(e) => setDob(e.target.value)}
-      />
+          {/* Date of birth */}
+          <div className="reg-rise reg-rise-6">
+            <label htmlFor="reg-dob" className={labelCls}>
+              Date of birth{' '}
+              <span className="normal-case tracking-normal font-normal text-[#888888]">
+                (optional)
+              </span>
+            </label>
+            <input
+              id="reg-dob"
+              type="date"
+              value={dob}
+              onChange={(e) => setDob(e.target.value)}
+              className={fieldCls(false)}
+            />
+          </div>
 
-      {/* Gender segmented control */}
-      <div>
-        <p className="text-xs font-semibold text-[#404040] mb-1">Gender (optional)</p>
-        <div className="flex gap-2">
-          {[
-            { label: 'Male', value: 'MALE' },
-            { label: 'Female', value: 'FEMALE' },
-            { label: 'Prefer not to say', value: null },
-          ].map((opt) => (
-            <button
-              key={opt.label}
-              type="button"
-              onClick={() => setGender(opt.value)}
-              className={`border text-sm px-3 py-1.5 rounded cursor-pointer transition-colors ${
-                gender === opt.value
-                  ? 'bg-[#0A0A0A] text-white border-[#0A0A0A]'
-                  : 'border-[#E0E0E0] text-[#404040] hover:bg-[#F7F7F7]'
-              }`}
+          {/* Gender */}
+          <div className="reg-rise reg-rise-7">
+            <p className={labelCls}>
+              Gender{' '}
+              <span className="normal-case tracking-normal font-normal text-[#888888]">
+                (optional)
+              </span>
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { label: 'Male', value: 'MALE' },
+                { label: 'Female', value: 'FEMALE' },
+                { label: 'Prefer not to say', value: null },
+              ].map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => setGender(opt.value)}
+                  className={`text-xs font-semibold px-3 py-2 rounded-none border cursor-pointer transition-colors duration-150 ${
+                    gender === opt.value
+                      ? 'bg-[#0A0A0A] text-white border-[#0A0A0A]'
+                      : 'bg-white border-[#E0E0E0] text-[#404040] hover:bg-[#F7F7F7] hover:border-[#C0C0C0]'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Server error */}
+          {error && (
+            <div
+              role="alert"
+              className="bg-[#FFF0F0] border border-[#CC0000] rounded-md p-3 text-sm text-[#CC0000] flex items-center gap-2"
             >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+              <AlertCircle size={16} className="shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Submit */}
+          <div className="reg-rise reg-rise-8 pt-1">
+            <Button
+              type="submit"
+              variant="primary"
+              loading={loading}
+              disabled={!canSubmit}
+              className="w-full py-2.5"
+            >
+              {loading ? 'Creating account…' : 'Create account'}
+            </Button>
+          </div>
+
+          {/* Footer */}
+          <p className="text-center text-xs text-[#888888] pt-2">
+            Already have an account?{' '}
+            <Link
+              to="/login"
+              className="font-semibold text-[#0A0A0A] hover:underline transition-colors"
+            >
+              Sign in
+            </Link>
+          </p>
+        </form>
       </div>
-
-      {error && (
-        <div className="bg-[#FFF0F0] border border-[#CC0000] rounded-md p-3 text-sm text-[#CC0000] flex items-center gap-2">
-          <AlertCircle size={16} className="shrink-0" />
-          {error}
-        </div>
-      )}
-
-      <Button
-        type="submit"
-        variant="primary"
-        loading={loading}
-        className="w-full"
-      >
-        Create account
-      </Button>
-    </form>
+    </>
   );
 }
 
@@ -492,8 +620,8 @@ export default function AuthPage({ mode }) {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 md:w-1/2 flex items-center justify-center min-h-screen bg-white">
-        <div className="max-w-sm w-full mx-auto px-8 py-16">
+      <div className="flex-1 md:w-1/2 flex justify-center min-h-screen bg-white overflow-y-auto">
+        <div className="max-w-sm w-full mx-auto px-8 py-12 self-start">
           {/* Tab switcher */}
           <div className="flex gap-6 mb-8">
             <Link
