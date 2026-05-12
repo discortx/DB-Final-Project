@@ -53,6 +53,8 @@ function validateUsername(val) {
 }
 
 /* ── Login Form ── */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function LoginForm() {
   const navigate = useNavigate();
   const { login: storeLogin } = useAuthStore();
@@ -63,17 +65,35 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [touched, setTouched] = useState({ email: false, password: false });
+
+  const emailError =
+    touched.email && !EMAIL_RE.test(email.trim())
+      ? 'Enter a valid email address.'
+      : '';
+  const passwordError =
+    touched.password && password.length < 1
+      ? 'Password is required.'
+      : '';
+
+  const canSubmit =
+    EMAIL_RE.test(email.trim()) && password.length >= 1 && !loading;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setTouched({ email: true, password: true });
+    if (!canSubmit) return;
     setError('');
     setLoading(true);
     try {
-      const res = await login({ email, password });
+      const res = await login({ email: email.trim(), password });
       storeLogin(res.data.user, res.data.token);
       socket.auth = { token: res.data.token };
       socket.connect();
-      addToast({ message: `Welcome back, ${res.data.user.first_name}!`, type: 'success' });
+      addToast({
+        message: `Welcome back, ${res.data.user.first_name}!`,
+        type: 'success',
+      });
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong');
@@ -83,61 +103,152 @@ function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-[#0A0A0A] mb-1">Welcome back.</h1>
-        <p className="text-sm text-[#888888] mb-6">Enter your credentials to continue.</p>
-      </div>
+    <>
+      <style>{`
+        @keyframes login-rise {
+          0%   { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        .login-rise { animation: login-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .login-rise-1 { animation-delay: 0.04s; }
+        .login-rise-2 { animation-delay: 0.10s; }
+        .login-rise-3 { animation-delay: 0.16s; }
+        .login-rise-4 { animation-delay: 0.22s; }
+        .login-rise-5 { animation-delay: 0.28s; }
+      `}</style>
 
-      <Input
-        label="Email address"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-        autoComplete="email"
-        placeholder="you@example.com"
-      />
-
-      <div className="w-full">
-        <label className="text-xs font-semibold text-[#404040] mb-1 block">Password</label>
-        <div className="relative">
-          <input
-            type={showPassword ? 'text' : 'password'}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-            placeholder="••••••••"
-            className="w-full border border-[#E0E0E0] bg-white rounded-md px-3 py-2 text-sm placeholder:text-[#888888] focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors pr-10"
-          />
-          <button
-            type="button"
-            tabIndex={-1}
-            onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] hover:text-[#0A0A0A] transition-colors"
-          >
-            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
+      <div className="bg-white border border-[#E0E0E0] rounded-lg p-8 shadow-[0_1px_4px_rgba(0,0,0,0.08)] login-rise">
+        <div className="mb-7 login-rise login-rise-1">
+          <h1 className="text-3xl font-bold tracking-tight text-[#0A0A0A] mb-1.5 leading-tight">
+            Welcome back.
+          </h1>
+          <p className="text-sm text-[#888888]">
+            Enter your credentials to continue.
+          </p>
         </div>
+
+        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          {/* Email */}
+          <div className="login-rise login-rise-2">
+            <label
+              htmlFor="login-email"
+              className="block text-xs font-semibold uppercase tracking-widest text-[#404040] mb-2"
+            >
+              Email
+            </label>
+            <input
+              id="login-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+              autoComplete="email"
+              autoFocus
+              placeholder="you@example.com"
+              aria-invalid={!!emailError}
+              aria-describedby={emailError ? 'login-email-error' : undefined}
+              className={`w-full bg-white rounded-md px-3 py-2.5 text-sm placeholder:text-[#888888] focus:outline-none transition-colors border ${
+                emailError
+                  ? 'border-[#CC0000] focus:ring-1 focus:ring-[#CC0000] focus:border-[#CC0000]'
+                  : 'border-[#E0E0E0] focus:border-black focus:ring-1 focus:ring-black'
+              }`}
+            />
+            {emailError && (
+              <p
+                id="login-email-error"
+                className="text-xs text-[#CC0000] mt-1.5 flex items-center gap-1"
+              >
+                <AlertCircle size={12} className="shrink-0" />
+                {emailError}
+              </p>
+            )}
+          </div>
+
+          {/* Password */}
+          <div className="login-rise login-rise-3">
+            <label
+              htmlFor="login-password"
+              className="block text-xs font-semibold uppercase tracking-widest text-[#404040] mb-2"
+            >
+              Password
+            </label>
+            <div className="relative">
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+                autoComplete="current-password"
+                placeholder="••••••••"
+                aria-invalid={!!passwordError}
+                aria-describedby={
+                  passwordError ? 'login-password-error' : undefined
+                }
+                className={`w-full bg-white rounded-md px-3 py-2.5 pr-10 text-sm placeholder:text-[#888888] focus:outline-none transition-colors border ${
+                  passwordError
+                    ? 'border-[#CC0000] focus:ring-1 focus:ring-[#CC0000] focus:border-[#CC0000]'
+                    : 'border-[#E0E0E0] focus:border-black focus:ring-1 focus:ring-black'
+                }`}
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#888888] hover:text-[#0A0A0A] transition-colors duration-150"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {passwordError && (
+              <p
+                id="login-password-error"
+                className="text-xs text-[#CC0000] mt-1.5 flex items-center gap-1"
+              >
+                <AlertCircle size={12} className="shrink-0" />
+                {passwordError}
+              </p>
+            )}
+          </div>
+
+          {/* Server / submission error */}
+          {error && (
+            <div
+              role="alert"
+              className="bg-[#FFF0F0] border border-[#CC0000] rounded-md p-3 text-sm text-[#CC0000] flex items-center gap-2"
+            >
+              <AlertCircle size={16} className="shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Submit */}
+          <div className="login-rise login-rise-4 pt-1">
+            <Button
+              type="submit"
+              variant="primary"
+              loading={loading}
+              disabled={!canSubmit}
+              className="w-full py-2.5"
+            >
+              {loading ? 'Signing in…' : 'Sign in'}
+            </Button>
+          </div>
+
+          {/* Footer */}
+          <p className="login-rise login-rise-5 text-center text-xs text-[#888888] pt-2">
+            New to Nexus?{' '}
+            <Link
+              to="/register"
+              className="font-semibold text-[#0A0A0A] hover:underline transition-colors"
+            >
+              Create an account
+            </Link>
+          </p>
+        </form>
       </div>
-
-      {error && (
-        <div className="bg-[#FFF0F0] border border-[#CC0000] rounded-md p-3 text-sm text-[#CC0000] flex items-center gap-2 mt-3">
-          <AlertCircle size={16} className="shrink-0" />
-          {error}
-        </div>
-      )}
-
-      <Button
-        type="submit"
-        variant="primary"
-        loading={loading}
-        className="w-full mt-4"
-      >
-        Sign in
-      </Button>
-    </form>
+    </>
   );
 }
 
