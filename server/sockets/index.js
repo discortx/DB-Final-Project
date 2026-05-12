@@ -45,6 +45,13 @@ function init(httpServer) {
 
     socket.on('chat:join', (chatId) => socket.join(`chat:${chatId}`));
 
+    socket.on('chat:typing:start', ({ chatId }) => {
+      socket.to(`chat:${chatId}`).emit('chat:typing', { userId, chatId, typing: true });
+    });
+    socket.on('chat:typing:stop', ({ chatId }) => {
+      socket.to(`chat:${chatId}`).emit('chat:typing', { userId, chatId, typing: false });
+    });
+
     socket.on('disconnect', async () => {
       await pool.query(`DELETE FROM online_presence WHERE user_id = $1`, [userId]);
     });

@@ -1,80 +1,241 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bell } from 'lucide-react';
 import { getNotifications, markRead, markAllRead } from '../api/notifications';
+import useNotifStore from '../store/notifStore';
+import socket from '../socket';
+import NotificationItem from '../components/notifications/NotificationItem';
+import Button from '../components/ui/Button';
+import EmptyState from '../components/ui/EmptyState';
+import Skeleton, { SkeletonText, SkeletonAvatar } from '../components/ui/Skeleton';
 
-const TYPE_ICON = {
-  MESSAGE: '💬', LIKE: '♥', COMMENT: '💭',
-  TAG: '🏷', GAME: '🎮', FRIEND_REQUEST: '👤',
-};
+// ─── helpers ────────────────────────────────────────────────────────────────
 
-function timeAgo(dateStr) {
-  const m = Math.floor((Date.now() - new Date(dateStr)) / 60000);
-  if (m < 1)   return 'just now';
-  if (m < 60)  return `${m}m ago`;
-  if (m < 1440) return `${Math.floor(m / 60)}h ago`;
-  return `${Math.floor(m / 1440)}d ago`;
+function isToday(date) {
+  const today = new Date();
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
 }
 
+function isYesterday(date) {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return (
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate()
+  );
+}
+
+function groupNotificationsByDate(notifications) {
+  const today = [];
+  const yesterday = [];
+  const earlier = [];
+
+  for (const n of notifications) {
+    const d = new Date(n.created_at);
+    if (isToday(d)) today.push(n);
+    else if (isYesterday(d)) yesterday.push(n);
+    else earlier.push(n);
+  }
+
+  const groups = [];
+  if (today.length) groups.push({ label: 'Today', items: today });
+  if (yesterday.length) groups.push({ label: 'Yesterday', items: yesterday });
+  if (earlier.length) groups.push({ label: 'Earlier', items: earlier });
+  return groups;
+}
+
+const FILTER_TABS = [
+  { key: 'all',      label: 'All' },
+  { key: 'unread',   label: 'Unread' },
+  { key: 'likes',    label: 'Likes' },
+  { key: 'comments', label: 'Comments' },
+  { key: 'messages', label: 'Messages' },
+];
+
+function filterNotifications(notifications, filter) {
+  switch (filter) {
+    case 'unread':   return notifications.filter((n) => !n.is_read);
+    case 'likes':    return notifications.filter((n) => n.type === 'LIKE');
+    case 'comments': return notifications.filter((n) => n.type === 'COMMENT');
+    case 'messages': return notifications.filter((n) => n.type === 'MESSAGE');
+    default:         return notifications;
+  }
+}
+
+// ─── NotificationsPage ───────────────────────────────────────────────────────
+
 export default function NotificationsPage() {
-  const [notifs, setNotifs]   = useState([]);
+  const navigate = useNavigate();
+  const resetUnread = useNotifStore((s) => s.reset);
+  const incrementUnread = useNotifStore((s) => s.increment);
+
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [markingAll, setMarkingAll] = useState(false);
 
   const load = async () => {
-    try { const r = await getNotifications(); setNotifs(r.data); } catch {}
-    setLoading(false);
+    try {
+      const r = await getNotifications();
+      setNotifications(r.data || []);
+    } catch {
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
 
-  const handleMarkOne = async (id) => {
-    await markRead(id);
-    setNotifs((n) => n.map((x) => x.id === id ? { ...x, is_read: true } : x));
+    // Socket: new notification comes in
+    const onNew = (notif) => {
+      setNotifications((prev) => [notif, ...prev]);
+      incrementUnread();
+    };
+    socket.on('notification:new', onNew);
+    return () => socket.off('notification:new', onNew);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleMarkAllRead = async () => {
+    setMarkingAll(true);
+    try {
+      await markAllRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      resetUnread();
+    } catch {
+      // ignore
+    } finally {
+      setMarkingAll(false);
+    }
   };
 
-  const handleMarkAll = async () => {
-    await markAllRead();
-    setNotifs((n) => n.map((x) => ({ ...x, is_read: true })));
+  const handleNotifClick = async (notif) => {
+    // Mark as read
+    if (!notif.is_read) {
+      try {
+        await markRead(notif.id);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n))
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    // Navigate based on type
+    switch (notif.type) {
+      case 'FRIEND_REQUEST':
+        navigate('/friends/requests');
+        break;
+      case 'LIKE':
+      case 'COMMENT':
+      case 'TAG':
+        navigate('/');
+        break;
+      case 'MESSAGE':
+        navigate('/chats');
+        break;
+      case 'GAME':
+        navigate('/games');
+        break;
+      default:
+        navigate('/');
+    }
   };
 
-  if (loading) return <div className="text-center py-12 text-gray-400">Loading…</div>;
+  const handleDismiss = (notifId) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+  };
 
-  const unreadCount = notifs.filter((n) => !n.is_read).length;
+  const filtered = filterNotifications(notifications, activeFilter);
+  const groups = groupNotificationsByDate(filtered);
+  const hasUnread = notifications.some((n) => !n.is_read);
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-[640px] mx-auto pt-6">
+      {/* Page header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-gray-900">Notifications</h1>
-        {unreadCount > 0 && (
-          <button onClick={handleMarkAll} className="text-sm text-blue-600 hover:underline">
-            Mark all as read
-          </button>
+        <h1 className="text-2xl font-bold text-[#0A0A0A]">Notifications</h1>
+        {hasUnread && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleMarkAllRead}
+            loading={markingAll}
+          >
+            Mark all read
+          </Button>
         )}
       </div>
 
-      {notifs.length === 0 && (
-        <div className="text-center py-12 text-gray-400">
-          <p className="text-4xl mb-2">🔔</p>
-          <p>No notifications yet.</p>
+      {/* Filter tabs */}
+      <div className="flex gap-1 mb-5 border-b border-[#E0E0E0] overflow-x-auto scrollbar-hide">
+        {FILTER_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveFilter(tab.key)}
+            className={`px-3 py-2 text-sm font-medium shrink-0 border-b-2 transition-colors -mb-px ${
+              activeFilter === tab.key
+                ? 'border-[#0A0A0A] text-[#0A0A0A]'
+                : 'border-transparent text-[#888888] hover:text-[#404040]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Loading skeleton */}
+      {loading && (
+        <div className="space-y-2">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-start gap-3 px-3 py-3">
+              <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+              <SkeletonAvatar size="sm" />
+              <div className="flex-1 space-y-1.5">
+                <SkeletonText className="w-3/4" />
+                <SkeletonText className="w-1/4" />
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      <div className="space-y-2">
-        {notifs.map((n) => (
-          <div
-            key={n.id}
-            onClick={() => !n.is_read && handleMarkOne(n.id)}
-            className={`flex items-start gap-3 p-4 rounded-xl border transition-colors cursor-pointer ${
-              n.is_read ? 'bg-white border-gray-100 shadow-sm' : 'bg-blue-50 border-blue-100 shadow-sm'
-            }`}
-          >
-            <span className="text-xl flex-shrink-0">{TYPE_ICON[n.type] || '🔔'}</span>
-            <div className="flex-1 min-w-0">
-              <p className={`text-sm ${n.is_read ? 'text-gray-700' : 'text-gray-900 font-medium'}`}>{n.text}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{timeAgo(n.created_at)}</p>
+      {/* Empty state */}
+      {!loading && filtered.length === 0 && (
+        <EmptyState
+          icon={Bell}
+          title="You're all caught up!"
+          description="No notifications yet."
+        />
+      )}
+
+      {/* Notification groups */}
+      {!loading &&
+        groups.map((group) => (
+          <div key={group.label} className="mb-4">
+            <p className="text-[10px] font-semibold text-[#888888] uppercase tracking-wider px-3 py-1.5">
+              {group.label}
+            </p>
+            <div className="divide-y divide-[#E0E0E0] border border-[#E0E0E0] rounded-lg overflow-hidden">
+              {group.items.map((notif) => (
+                <NotificationItem
+                  key={notif.id}
+                  notification={notif}
+                  onClick={handleNotifClick}
+                  onDismiss={handleDismiss}
+                />
+              ))}
             </div>
-            {!n.is_read && <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />}
           </div>
         ))}
-      </div>
     </div>
   );
 }

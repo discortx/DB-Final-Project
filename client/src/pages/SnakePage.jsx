@@ -1,195 +1,565 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { submitSnake, getLeaderboard } from '../api/games';
+import { useNavigate, Link } from 'react-router-dom';
+import { ChevronLeft, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
+import { upsertSnakeScore, getSnakeLeaderboard } from '../api/games';
+import useAuthStore from '../store/authStore';
+import Avatar from '../components/ui/Avatar';
+import Skeleton from '../components/ui/Skeleton';
+import { SkeletonAvatar } from '../components/ui/Skeleton';
 
-const COLS = 20, ROWS = 20, CELL = 20;
-const W = COLS * CELL, H = ROWS * CELL;
-const DIRS = { ArrowUp: [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0],
-               w: [0,-1], s: [0,1], a: [-1,0], d: [1,0] };
+// ─── Game constants ──────────────────────────────────────────────────────────
+const CELL_SIZE = 20;
+const COLS = 20;
+const ROWS = 20;
+const CANVAS_W = COLS * CELL_SIZE; // 400
+const CANVAS_H = ROWS * CELL_SIZE; // 400
+const INITIAL_INTERVAL = 150;
+const SPEED_UP_EVERY = 5; // every 5 food, speed up
+const SPEED_UP_AMOUNT = 5; // ms reduction per level
 
-function rnd() { return [Math.floor(Math.random() * COLS), Math.floor(Math.random() * ROWS)]; }
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function randomCell(snake) {
+  let pos;
+  do {
+    pos = {
+      x: Math.floor(Math.random() * COLS),
+      y: Math.floor(Math.random() * ROWS),
+    };
+  } while (snake.some((s) => s.x === pos.x && s.y === pos.y));
+  return pos;
+}
 
-const initState = () => {
-  const head = [10, 10];
-  return {
-    snake: [head, [9, 10], [8, 10]],
-    dir:   [1, 0],
-    food:  rnd(),
-    alive: false,
-    started: false,
-    score: 0,
-  };
-};
+function relativeTime(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
 
+// ─── Leaderboard ─────────────────────────────────────────────────────────────
+function LeaderboardTable({ entries, currentUserId }) {
+  if (!entries.length) {
+    return (
+      <p className="text-sm text-[#888888] text-center py-6">
+        Play Snake to appear on the leaderboard!
+      </p>
+    );
+  }
+
+  return (
+    <div className="w-full">
+      <div className="grid grid-cols-[32px_1fr_64px_64px] gap-2 px-3 py-2">
+        <span className="text-[10px] uppercase tracking-widest text-[#888888] font-semibold">#</span>
+        <span className="text-[10px] uppercase tracking-widest text-[#888888] font-semibold">Player</span>
+        <span className="text-[10px] uppercase tracking-widest text-[#888888] font-semibold text-right">Score</span>
+        <span className="text-[10px] uppercase tracking-widest text-[#888888] font-semibold text-right">Date</span>
+      </div>
+      <div className="divide-y divide-[#E0E0E0]">
+        {entries.map((entry) => {
+          const isMe = String(entry.user_id) === String(currentUserId);
+          const rankColor =
+            entry.rank === 1 ? 'text-[#0A0A0A]'
+            : entry.rank === 2 ? 'text-[#404040]'
+            : entry.rank === 3 ? 'text-[#888888]'
+            : 'text-[#888888]';
+          return (
+            <div
+              key={entry.user_id ?? entry.id}
+              className={`grid grid-cols-[32px_1fr_64px_64px] gap-2 items-center px-3 py-2.5 ${
+                isMe ? 'bg-[#F7F7F7] rounded-lg border-l-2 border-black' : ''
+              }`}
+            >
+              <span className={`font-bold text-sm ${rankColor}`}>{entry.rank}</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <Avatar size="sm" firstName={entry.first_name || ''} lastName={entry.last_name || ''} />
+                <span className="text-sm text-[#0A0A0A] truncate font-medium">
+                  {entry.first_name} {entry.last_name}
+                </span>
+              </div>
+              <span className="font-bold text-sm text-right text-[#0A0A0A]">{entry.high_score}</span>
+              <span className="text-xs text-[#888888] text-right">
+                {entry.updated_at
+                  ? new Date(entry.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  : '—'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function SnakePage() {
-  const navigate  = useNavigate();
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+
   const canvasRef = useRef(null);
-  const stateRef  = useRef(initState());
-  const frameRef  = useRef(null);
-  const [display, setDisplay] = useState({ score: 0, alive: false, started: false });
-  const [submitted, setSubmitted] = useState(false);
-  const [board, setBoard] = useState([]);
 
+  // ── Game state in refs (no re-renders for game loop) ──
+  const snakeRef = useRef([{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }]);
+  const dirRef = useRef({ x: 1, y: 0 });
+  const nextDirRef = useRef({ x: 1, y: 0 }); // buffer for input
+  const foodRef = useRef({ x: 5, y: 5 });
+  const scoreRef = useRef(0);
+  const statusRef = useRef('idle'); // 'idle' | 'playing' | 'paused' | 'gameover'
+  const intervalRef = useRef(null);
+  const speedLevelRef = useRef(0);
+  const isNewHighScoreRef = useRef(false);
+
+  // ── React state for display only ──
+  const [score, setScore] = useState(0);
+  const [highScore, setHighScore] = useState(0);
+  const [gameStatus, setGameStatus] = useState('idle');
+  const [isNewHighScore, setIsNewHighScore] = useState(false);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
+
+  // ── Draw function (reads from refs) ──
   const draw = useCallback(() => {
-    const ctx = canvasRef.current?.getContext('2d');
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const { snake, food, alive } = stateRef.current;
 
-    ctx.fillStyle = '#f9fafb';
-    ctx.fillRect(0, 0, W, H);
+    const snake = snakeRef.current;
+    const food = foodRef.current;
+    const status = statusRef.current;
+    const currentScore = scoreRef.current;
 
-    ctx.strokeStyle = '#e5e7eb';
+    // Background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    // Grid lines (very light)
+    ctx.strokeStyle = '#F0F0F0';
     ctx.lineWidth = 0.5;
-    for (let x = 0; x <= W; x += CELL) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-    for (let y = 0; y <= H; y += CELL) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    for (let x = 0; x <= CANVAS_W; x += CELL_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, CANVAS_H);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= CANVAS_H; y += CELL_SIZE) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(CANVAS_W, y);
+      ctx.stroke();
+    }
 
-    ctx.fillStyle = '#ef4444';
+    // Food (red square with slight rounding)
+    ctx.fillStyle = '#CC0000';
+    const fr = 3;
+    const fx = food.x * CELL_SIZE + 2;
+    const fy = food.y * CELL_SIZE + 2;
+    const fs = CELL_SIZE - 4;
     ctx.beginPath();
-    ctx.arc(food[0] * CELL + CELL / 2, food[1] * CELL + CELL / 2, CELL / 2 - 2, 0, Math.PI * 2);
+    ctx.moveTo(fx + fr, fy);
+    ctx.lineTo(fx + fs - fr, fy);
+    ctx.quadraticCurveTo(fx + fs, fy, fx + fs, fy + fr);
+    ctx.lineTo(fx + fs, fy + fs - fr);
+    ctx.quadraticCurveTo(fx + fs, fy + fs, fx + fs - fr, fy + fs);
+    ctx.lineTo(fx + fr, fy + fs);
+    ctx.quadraticCurveTo(fx, fy + fs, fx, fy + fs - fr);
+    ctx.lineTo(fx, fy + fr);
+    ctx.quadraticCurveTo(fx, fy, fx + fr, fy);
+    ctx.closePath();
     ctx.fill();
 
-    snake.forEach(([x, y], i) => {
-      ctx.fillStyle = i === 0 ? (alive ? '#2563eb' : '#9ca3af') : (alive ? '#3b82f6' : '#d1d5db');
-      const r = i === 0 ? 5 : 3;
+    // Snake segments
+    snake.forEach((seg, i) => {
+      const isHead = i === 0;
+      ctx.fillStyle = isHead ? '#0A0A0A' : i < 3 ? '#222222' : '#404040';
+      const r = isHead ? 5 : 3;
+      const sx = seg.x * CELL_SIZE + 1;
+      const sy = seg.y * CELL_SIZE + 1;
+      const sw = CELL_SIZE - 2;
+      const sh = CELL_SIZE - 2;
       ctx.beginPath();
-      ctx.roundRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2, r);
+      ctx.moveTo(sx + r, sy);
+      ctx.lineTo(sx + sw - r, sy);
+      ctx.quadraticCurveTo(sx + sw, sy, sx + sw, sy + r);
+      ctx.lineTo(sx + sw, sy + sh - r);
+      ctx.quadraticCurveTo(sx + sw, sy + sh, sx + sw - r, sy + sh);
+      ctx.lineTo(sx + r, sy + sh);
+      ctx.quadraticCurveTo(sx, sy + sh, sx, sy + sh - r);
+      ctx.lineTo(sx, sy + r);
+      ctx.quadraticCurveTo(sx, sy, sx + r, sy);
+      ctx.closePath();
       ctx.fill();
     });
+
+    // Overlays
+    if (status === 'idle') {
+      ctx.fillStyle = 'rgba(0,0,0,0.60)';
+      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 36px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('SNAKE', CANVAS_W / 2, CANVAS_H / 2 - 24);
+      ctx.font = '16px Inter, system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.fillText('Press Space to start', CANVAS_W / 2, CANVAS_H / 2 + 16);
+    } else if (status === 'paused') {
+      ctx.fillStyle = 'rgba(0,0,0,0.40)';
+      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 32px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('PAUSED', CANVAS_W / 2, CANVAS_H / 2);
+      ctx.font = '14px Inter, system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.70)';
+      ctx.fillText('Press Space to resume', CANVAS_W / 2, CANVAS_H / 2 + 36);
+    } else if (status === 'gameover') {
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 32px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('GAME OVER', CANVAS_W / 2, CANVAS_H / 2 - 40);
+      ctx.font = '18px Inter, system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillText(`Score: ${currentScore}`, CANVAS_W / 2, CANVAS_H / 2);
+      if (isNewHighScoreRef.current) {
+        ctx.font = 'bold 16px Inter, system-ui, sans-serif';
+        ctx.fillStyle = '#F59E0B';
+        ctx.fillText('NEW HIGH SCORE!', CANVAS_W / 2, CANVAS_H / 2 + 34);
+      }
+    }
   }, []);
 
-  const tick = useCallback(() => {
-    const s = stateRef.current;
-    if (!s.alive) return;
+  // ── Init game state ──
+  const initGame = useCallback(() => {
+    snakeRef.current = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+    dirRef.current = { x: 1, y: 0 };
+    nextDirRef.current = { x: 1, y: 0 };
+    scoreRef.current = 0;
+    speedLevelRef.current = 0;
+    isNewHighScoreRef.current = false;
+    foodRef.current = randomCell(snakeRef.current);
+    setScore(0);
+    setIsNewHighScore(false);
+  }, []);
 
-    const [hx, hy] = s.snake[0];
-    const [dx, dy] = s.dir;
-    const nx = hx + dx, ny = hy + dy;
+  // ── Stop interval ──
+  const stopInterval = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
-    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || s.snake.some(([x, y]) => x === nx && y === ny)) {
-      stateRef.current = { ...s, alive: false };
-      setDisplay((d) => ({ ...d, alive: false }));
-      draw();
+  // ── Game step (called on interval) ──
+  const gameStep = useCallback(() => {
+    const snake = snakeRef.current;
+    // Commit buffered direction
+    dirRef.current = nextDirRef.current;
+    const dir = dirRef.current;
+
+    const head = snake[0];
+    const nx = (head.x + dir.x + COLS) % COLS;
+    const ny = (head.y + dir.y + ROWS) % ROWS;
+
+    // Check self collision
+    if (snake.some((s) => s.x === nx && s.y === ny)) {
+      // Game over
+      stopInterval();
+      statusRef.current = 'gameover';
+      setGameStatus('gameover');
+
+      const finalScore = scoreRef.current;
+      setScore(finalScore);
+
+      setHighScore((prev) => {
+        if (finalScore > prev) {
+          isNewHighScoreRef.current = true;
+          setIsNewHighScore(true);
+          // Submit to server
+          upsertSnakeScore(finalScore)
+            .then(() => getSnakeLeaderboard())
+            .then((r) => setLeaderboard(r.data || []))
+            .catch(() => {});
+          draw();
+          return finalScore;
+        }
+        draw();
+        return prev;
+      });
       return;
     }
 
-    const ate = nx === s.food[0] && ny === s.food[1];
-    const newSnake = [[nx, ny], ...s.snake.slice(0, ate ? undefined : -1)];
-    const newFood  = ate ? rnd() : s.food;
-    const newScore = ate ? s.score + 1 : s.score;
+    const newHead = { x: nx, y: ny };
+    const ateFood = nx === foodRef.current.x && ny === foodRef.current.y;
 
-    stateRef.current = { ...s, snake: newSnake, food: newFood, score: newScore };
-    setDisplay((d) => ({ ...d, score: newScore }));
+    let newSnake;
+    if (ateFood) {
+      newSnake = [newHead, ...snake];
+      const newScore = scoreRef.current + 1;
+      scoreRef.current = newScore;
+      setScore(newScore);
+
+      // Place new food
+      foodRef.current = randomCell(newSnake);
+
+      // Speed up every SPEED_UP_EVERY food
+      if (newScore % SPEED_UP_EVERY === 0) {
+        speedLevelRef.current += 1;
+        const newLevel = speedLevelRef.current;
+        stopInterval();
+        const newInterval = Math.max(
+          60,
+          INITIAL_INTERVAL - newLevel * SPEED_UP_AMOUNT
+        );
+        intervalRef.current = setInterval(gameStep, newInterval);
+      }
+    } else {
+      newSnake = [newHead, ...snake.slice(0, -1)];
+    }
+
+    snakeRef.current = newSnake;
     draw();
-  }, [draw]);
+  }, [draw, stopInterval]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const interval = setInterval(tick, 140);
-    return () => clearInterval(interval);
-  }, [tick]);
+  // ── Start game ──
+  const startGame = useCallback(() => {
+    stopInterval();
+    initGame();
+    statusRef.current = 'playing';
+    setGameStatus('playing');
+    intervalRef.current = setInterval(gameStep, INITIAL_INTERVAL);
+    draw();
+  }, [stopInterval, initGame, gameStep, draw]);
 
-  useEffect(() => { draw(); }, [draw]);
+  // ── Pause ──
+  const pauseGame = useCallback(() => {
+    stopInterval();
+    statusRef.current = 'paused';
+    setGameStatus('paused');
+    draw();
+  }, [stopInterval, draw]);
 
-  useEffect(() => {
-    getLeaderboard().then((r) => setBoard(r.data));
-  }, []);
+  // ── Resume ──
+  const resumeGame = useCallback(() => {
+    statusRef.current = 'playing';
+    setGameStatus('playing');
+    const currentLevel = speedLevelRef.current;
+    const interval = Math.max(60, INITIAL_INTERVAL - currentLevel * SPEED_UP_AMOUNT);
+    intervalRef.current = setInterval(gameStep, interval);
+    draw();
+  }, [gameStep, draw]);
 
+  // ── Keyboard handler ──
   useEffect(() => {
     const handler = (e) => {
-      if (DIRS[e.key]) {
+      const key = e.key;
+      const status = statusRef.current;
+      const currentDir = dirRef.current;
+
+      // Direction keys
+      if (key === 'ArrowUp' || key === 'w' || key === 'W') {
         e.preventDefault();
-        const s = stateRef.current;
-        const [dx, dy] = DIRS[e.key];
-        const [cx, cy] = s.dir;
-        if (dx === -cx && dy === -cy) return;
-        stateRef.current = { ...s, dir: [dx, dy] };
-      }
-      if (e.key === ' ' || e.key === 'Enter') {
-        const s = stateRef.current;
-        if (!s.alive) {
-          stateRef.current = { ...initState(), alive: true, started: true };
-          setDisplay({ score: 0, alive: true, started: true });
-          setSubmitted(false);
+        if (currentDir.y !== 1) nextDirRef.current = { x: 0, y: -1 };
+      } else if (key === 'ArrowDown' || key === 's' || key === 'S') {
+        e.preventDefault();
+        if (currentDir.y !== -1) nextDirRef.current = { x: 0, y: 1 };
+      } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
+        e.preventDefault();
+        if (currentDir.x !== 1) nextDirRef.current = { x: -1, y: 0 };
+      } else if (key === 'ArrowRight' || key === 'd' || key === 'D') {
+        e.preventDefault();
+        if (currentDir.x !== -1) nextDirRef.current = { x: 1, y: 0 };
+      } else if (key === ' ' || key === 'p' || key === 'P') {
+        e.preventDefault();
+        if (status === 'idle' || status === 'gameover') {
+          startGame();
+        } else if (status === 'playing') {
+          pauseGame();
+        } else if (status === 'paused') {
+          resumeGame();
         }
       }
     };
+
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [startGame, pauseGame, resumeGame]);
 
-  const handleSubmit = async () => {
-    try {
-      await submitSnake(stateRef.current.score);
-      setSubmitted(true);
-      const r = await getLeaderboard();
-      setBoard(r.data);
-    } catch {}
-  };
+  // ── Mobile D-pad handler ──
+  const handleDpad = useCallback((dirKey) => {
+    const currentDir = dirRef.current;
+    if (dirKey === 'up' && currentDir.y !== 1) nextDirRef.current = { x: 0, y: -1 };
+    else if (dirKey === 'down' && currentDir.y !== -1) nextDirRef.current = { x: 0, y: 1 };
+    else if (dirKey === 'left' && currentDir.x !== 1) nextDirRef.current = { x: -1, y: 0 };
+    else if (dirKey === 'right' && currentDir.x !== -1) nextDirRef.current = { x: 1, y: 0 };
 
-  const startGame = () => {
-    stateRef.current = { ...initState(), alive: true, started: true };
-    setDisplay({ score: 0, alive: true, started: true });
-    setSubmitted(false);
-    canvasRef.current?.focus();
-  };
+    // Auto-start on first d-pad press
+    if (statusRef.current === 'idle' || statusRef.current === 'gameover') {
+      startGame();
+    }
+  }, [startGame]);
+
+  // ── Load leaderboard + initial draw on mount ──
+  useEffect(() => {
+    setLoadingLeaderboard(true);
+    getSnakeLeaderboard()
+      .then((r) => {
+        const data = r.data || [];
+        setLeaderboard(data);
+        // Set my high score
+        if (user) {
+          const me = data.find((e) => String(e.user_id) === String(user.id));
+          if (me) setHighScore(me.high_score);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingLeaderboard(false));
+
+    // Initial draw (idle overlay)
+    draw();
+
+    return () => stopInterval();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/games')} className="text-sm text-gray-500 hover:text-gray-700">← Lobby</button>
-        <h1 className="text-2xl font-bold text-gray-900">🐍 Snake</h1>
-        <span className="ml-auto text-lg font-bold text-gray-700">Score: {display.score}</span>
+    <div className="max-w-[540px] mx-auto pt-8 pb-12 px-4 text-center">
+      {/* Back link */}
+      <div className="flex items-center justify-start mb-2">
+        <Link
+          to="/games"
+          className="inline-flex items-center gap-1 text-sm text-[#888888] hover:text-[#0A0A0A] transition-colors"
+        >
+          <ChevronLeft size={16} />
+          Back to Games
+        </Link>
       </div>
 
-      <div className="flex gap-6 flex-wrap">
-        <div className="flex flex-col items-center gap-3">
-          <canvas
-            ref={canvasRef}
-            width={W} height={H}
-            tabIndex={0}
-            className="border-2 border-gray-200 rounded-xl cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500"
-            onClick={startGame}
-          />
+      <h2 className="text-2xl font-bold text-[#0A0A0A] mb-1">Snake</h2>
+      <p className="text-sm text-[#888888] mb-4">
+        Use arrow keys or WASD to move. Space to pause.
+      </p>
 
-          {!display.started && (
-            <p className="text-gray-500 text-sm">Click canvas or press Space to start</p>
-          )}
-          {display.started && !display.alive && (
-            <div className="text-center space-y-2">
-              <p className="font-semibold text-gray-900">Game over! Score: {display.score}</p>
-              <div className="flex gap-2 justify-center">
-                <button onClick={startGame} className="px-4 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">
-                  Play Again
-                </button>
-                {!submitted && display.score > 0 && (
-                  <button onClick={handleSubmit} className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">
-                    Submit Score
-                  </button>
-                )}
-                {submitted && <span className="text-sm text-green-600 py-1.5">✓ Score submitted!</span>}
-              </div>
-            </div>
-          )}
-
-          <div className="text-xs text-gray-400 text-center">
-            Arrow keys or WASD to move · Space/Enter to restart
-          </div>
+      {/* Score display */}
+      <div className="flex items-center justify-center gap-8 mb-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#888888]">
+            SCORE
+          </p>
+          <p className="text-4xl font-black text-[#0A0A0A] leading-none mt-1">
+            {score}
+          </p>
         </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#888888]">
+            BEST
+          </p>
+          <p className="text-sm text-[#888888] font-semibold leading-none mt-1">
+            {highScore > 0 ? highScore : '—'}
+          </p>
+        </div>
+      </div>
 
-        <div className="flex-1 min-w-48">
-          <h2 className="font-semibold text-gray-900 mb-3">🏆 Leaderboard</h2>
-          {board.length === 0 && <p className="text-gray-400 text-sm">No scores yet.</p>}
+      {/* Canvas wrapper */}
+      <div className="relative inline-block">
+        <canvas
+          ref={canvasRef}
+          width={CANVAS_W}
+          height={CANVAS_H}
+          className="border-2 border-[#0A0A0A] block"
+          style={{ imageRendering: 'pixelated' }}
+        />
+
+        {/* React overlay for game over (buttons only — canvas draws the text) */}
+        {gameStatus === 'gameover' && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-end pb-10 gap-3 pointer-events-none">
+            <div className="flex flex-col items-center gap-2 pointer-events-auto">
+              <button
+                type="button"
+                className="bg-white text-[#0A0A0A] rounded-none px-6 py-2 font-semibold text-sm hover:bg-[#F0F0F0] transition-colors border border-white"
+                onClick={startGame}
+              >
+                Play Again
+              </button>
+              <button
+                type="button"
+                className="text-white border border-white rounded-none px-4 py-2 text-sm hover:bg-white/10 transition-colors"
+                onClick={() => navigate('/games')}
+              >
+                Back to Games
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile D-pad */}
+      <div className="flex flex-col items-center gap-1 mt-4 md:hidden">
+        <button
+          type="button"
+          className="w-12 h-12 bg-[#F7F7F7] border border-[#E0E0E0] rounded-md flex items-center justify-center hover:bg-[#EFEFEF] active:bg-[#E0E0E0] cursor-pointer touch-none"
+          onTouchStart={(e) => { e.preventDefault(); handleDpad('up'); }}
+          onClick={() => handleDpad('up')}
+        >
+          <ArrowUp size={18} />
+        </button>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            className="w-12 h-12 bg-[#F7F7F7] border border-[#E0E0E0] rounded-md flex items-center justify-center hover:bg-[#EFEFEF] active:bg-[#E0E0E0] cursor-pointer touch-none"
+            onTouchStart={(e) => { e.preventDefault(); handleDpad('left'); }}
+            onClick={() => handleDpad('left')}
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <button
+            type="button"
+            className="w-12 h-12 bg-[#F7F7F7] border border-[#E0E0E0] rounded-md flex items-center justify-center hover:bg-[#EFEFEF] active:bg-[#E0E0E0] cursor-pointer touch-none"
+            onTouchStart={(e) => { e.preventDefault(); handleDpad('down'); }}
+            onClick={() => handleDpad('down')}
+          >
+            <ArrowDown size={18} />
+          </button>
+          <button
+            type="button"
+            className="w-12 h-12 bg-[#F7F7F7] border border-[#E0E0E0] rounded-md flex items-center justify-center hover:bg-[#EFEFEF] active:bg-[#E0E0E0] cursor-pointer touch-none"
+            onTouchStart={(e) => { e.preventDefault(); handleDpad('right'); }}
+            onClick={() => handleDpad('right')}
+          >
+            <ArrowRight size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* Leaderboard preview */}
+      <div className="mt-10 text-left">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-[#888888] mb-4">
+          GLOBAL LEADERBOARD
+        </p>
+        {loadingLeaderboard ? (
           <div className="space-y-2">
-            {board.map((e) => (
-              <div key={e.id} className="flex items-center gap-2 py-1.5 border-b border-gray-100 last:border-0">
-                <span className={`text-sm font-bold w-5 ${e.rank === 1 ? 'text-yellow-500' : e.rank === 2 ? 'text-gray-400' : e.rank === 3 ? 'text-amber-600' : 'text-gray-300'}`}>
-                  {e.rank}
-                </span>
-                <span className="flex-1 text-sm text-gray-700 truncate">{e.first_name} {e.last_name}</span>
-                <span className="text-sm font-semibold">{e.high_score}</span>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-2.5 border-b border-[#E0E0E0]">
+                <Skeleton className="w-8 h-4" />
+                <SkeletonAvatar size="sm" />
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="h-3 w-10 ml-auto" />
+                <Skeleton className="h-3 w-14" />
               </div>
             ))}
           </div>
-        </div>
+        ) : (
+          <LeaderboardTable
+            entries={leaderboard.slice(0, 5)}
+            currentUserId={user?.id}
+          />
+        )}
       </div>
     </div>
   );
