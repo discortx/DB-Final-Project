@@ -583,23 +583,40 @@ function RegisterForm() {
 }
 
 /* ── Friend Graph canvas animation ── */
-function FriendGraph() {
+// hoveredRef.current: null | 'connect' | 'share' | 'play'
+function FriendGraph({ hoveredRef }) {
   const canvasRef = useRef(null);
   const stateRef = useRef({ nodes: null, frame: null });
+
+  // Interpolated animation params — all lerped toward targets each frame
+  const pRef = useRef({
+    edgeAlphaMax: 0.25, // connect → 0.8
+    nodeAlpha:    0.35, // connect → 0.65
+    lineWidth:    0.5,  // share   → 1.5
+    colorT:       0,    // 0 = #888888, 1 = #ffffff (share)
+    speedMult:    1,    // play    → 2.2
+    pulseAmp:     0,    // connect → 1.6  (radius oscillation px)
+    pulseSpeed:   0.04, // connect → 0.13 (phase increment / frame)
+    pulsePhase:   0,
+  });
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const s = stateRef.current;
+    const p = pRef.current;
     const COUNT = 18;
     const LINK_DIST = 150;
+    const LERP = 0.09; // ~0.45 s to reach target at 60 fps
 
     const setSize = () => {
-      canvas.width = canvas.offsetWidth;
+      canvas.width  = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
     };
     setSize();
+
+    const lerp = (a, b) => a + (b - a) * LERP;
 
     const draw = () => {
       const w = canvas.width;
@@ -610,40 +627,54 @@ function FriendGraph() {
         return;
       }
 
-      // Lazy-init nodes on first frame with real dimensions
       if (!s.nodes) {
         s.nodes = Array.from({ length: COUNT }, () => ({
-          x: Math.random() * w,
-          y: Math.random() * h,
+          x:  Math.random() * w,
+          y:  Math.random() * h,
           vx: (Math.random() - 0.5) * 0.35,
           vy: (Math.random() - 0.5) * 0.35,
-          r: 2 + Math.random() * 1.5,
+          r:  2 + Math.random() * 1.5,
         }));
       }
+
+      // ── Lerp params toward hover targets ──────────────────────────────────
+      const hov = hoveredRef ? hoveredRef.current : null;
+      p.edgeAlphaMax = lerp(p.edgeAlphaMax, hov === 'connect' ? 0.80 : 0.25);
+      p.nodeAlpha    = lerp(p.nodeAlpha,    hov === 'connect' ? 0.65 : 0.35);
+      p.lineWidth    = lerp(p.lineWidth,    hov === 'share'   ? 1.50 : 0.50);
+      p.colorT       = lerp(p.colorT,       hov === 'share'   ? 1.00 : 0.00);
+      p.speedMult    = lerp(p.speedMult,    hov === 'play'    ? 2.20 : 1.00);
+      p.pulseAmp     = lerp(p.pulseAmp,     hov === 'connect' ? 1.60 : 0.00);
+      p.pulseSpeed   = lerp(p.pulseSpeed,   hov === 'connect' ? 0.13 : 0.04);
+      p.pulsePhase  += p.pulseSpeed;
+
+      // Stroke color: #888888 → #ffffff
+      const cv = Math.round(136 + 119 * p.colorT);
+      const strokeColor = `rgb(${cv},${cv},${cv})`;
 
       ctx.clearRect(0, 0, w, h);
       const nodes = s.nodes;
 
-      // Drift nodes, wrap at edges
+      // ── Move nodes ────────────────────────────────────────────────────────
       nodes.forEach((n) => {
-        n.x += n.vx;
-        n.y += n.vy;
+        n.x += n.vx * p.speedMult;
+        n.y += n.vy * p.speedMult;
         if (n.x < -20) n.x = w + 20;
         if (n.x > w + 20) n.x = -20;
         if (n.y < -20) n.y = h + 20;
         if (n.y > h + 20) n.y = -20;
       });
 
-      // Draw edges
+      // ── Edges ─────────────────────────────────────────────────────────────
+      ctx.lineWidth = p.lineWidth;
+      ctx.strokeStyle = strokeColor;
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const dx = nodes[i].x - nodes[j].x;
           const dy = nodes[i].y - nodes[j].y;
-          const d = Math.sqrt(dx * dx + dy * dy);
+          const d  = Math.sqrt(dx * dx + dy * dy);
           if (d < LINK_DIST) {
-            ctx.globalAlpha = (1 - d / LINK_DIST) * 0.25;
-            ctx.strokeStyle = '#888888';
-            ctx.lineWidth = 0.5;
+            ctx.globalAlpha = (1 - d / LINK_DIST) * p.edgeAlphaMax;
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
             ctx.lineTo(nodes[j].x, nodes[j].y);
@@ -652,12 +683,13 @@ function FriendGraph() {
         }
       }
 
-      // Draw nodes
-      ctx.fillStyle = '#888888';
-      ctx.globalAlpha = 0.35;
-      nodes.forEach((n) => {
+      // ── Nodes ─────────────────────────────────────────────────────────────
+      ctx.fillStyle = strokeColor;
+      ctx.globalAlpha = p.nodeAlpha;
+      nodes.forEach((n, i) => {
+        const r = Math.max(0.5, n.r + Math.sin(p.pulsePhase + i * 0.72) * p.pulseAmp);
         ctx.beginPath();
-        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
         ctx.fill();
       });
 
@@ -674,7 +706,7 @@ function FriendGraph() {
       cancelAnimationFrame(s.frame);
       ro.disconnect();
     };
-  }, []);
+  }, [hoveredRef]);
 
   return (
     <canvas
@@ -695,25 +727,44 @@ function FriendGraph() {
 /* ── Main AuthPage ── */
 export default function AuthPage({ mode }) {
   const isLogin = mode === 'login';
+  const hoveredRef = useRef(null);
 
   return (
     <div className="h-screen overflow-hidden flex">
       {/* Left panel — fixed to viewport height, never scrolls */}
       <div className="hidden md:flex w-1/2 h-screen bg-[#0A0A0A] text-white flex-col p-8 overflow-hidden relative">
         {/* Friend graph — z-0, masked to soft ellipse behind taglines */}
-        <FriendGraph />
+        <FriendGraph hoveredRef={hoveredRef} />
 
         {/* Content — z-10 so it sits above the canvas */}
         <div className="relative z-10 flex flex-col h-full">
           {/* Logo */}
           <div className="font-black text-2xl tracking-[-0.04em] shrink-0">NEXUS</div>
 
-          {/* Center taglines — flex-1 keeps this region vertically centered */}
+          {/* Center taglines — each word triggers a different graph state */}
           <div className="flex-1 flex items-center min-h-0">
             <div>
-              <p className="font-black text-5xl leading-tight">Connect.</p>
-              <p className="font-black text-5xl leading-tight">Share.</p>
-              <p className="font-black text-5xl leading-tight">Play.</p>
+              <p className="font-black text-5xl leading-tight">
+                <span
+                  className="cursor-default select-none transition-opacity duration-300 hover:opacity-100 opacity-80"
+                  onMouseEnter={() => { hoveredRef.current = 'connect'; }}
+                  onMouseLeave={() => { hoveredRef.current = null; }}
+                >Connect</span>.
+              </p>
+              <p className="font-black text-5xl leading-tight">
+                <span
+                  className="cursor-default select-none transition-opacity duration-300 hover:opacity-100 opacity-80"
+                  onMouseEnter={() => { hoveredRef.current = 'share'; }}
+                  onMouseLeave={() => { hoveredRef.current = null; }}
+                >Share</span>.
+              </p>
+              <p className="font-black text-5xl leading-tight">
+                <span
+                  className="cursor-default select-none transition-opacity duration-300 hover:opacity-100 opacity-80"
+                  onMouseEnter={() => { hoveredRef.current = 'play'; }}
+                  onMouseLeave={() => { hoveredRef.current = null; }}
+                >Play</span>.
+              </p>
             </div>
           </div>
 
