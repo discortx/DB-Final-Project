@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Users,
@@ -582,6 +582,116 @@ function RegisterForm() {
   );
 }
 
+/* ── Friend Graph canvas animation ── */
+function FriendGraph() {
+  const canvasRef = useRef(null);
+  const stateRef = useRef({ nodes: null, frame: null });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const s = stateRef.current;
+    const COUNT = 18;
+    const LINK_DIST = 150;
+
+    const setSize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
+    setSize();
+
+    const draw = () => {
+      const w = canvas.width;
+      const h = canvas.height;
+
+      if (w === 0 || h === 0) {
+        s.frame = requestAnimationFrame(draw);
+        return;
+      }
+
+      // Lazy-init nodes on first frame with real dimensions
+      if (!s.nodes) {
+        s.nodes = Array.from({ length: COUNT }, () => ({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          vx: (Math.random() - 0.5) * 0.35,
+          vy: (Math.random() - 0.5) * 0.35,
+          r: 2 + Math.random() * 1.5,
+        }));
+      }
+
+      ctx.clearRect(0, 0, w, h);
+      const nodes = s.nodes;
+
+      // Drift nodes, wrap at edges
+      nodes.forEach((n) => {
+        n.x += n.vx;
+        n.y += n.vy;
+        if (n.x < -20) n.x = w + 20;
+        if (n.x > w + 20) n.x = -20;
+        if (n.y < -20) n.y = h + 20;
+        if (n.y > h + 20) n.y = -20;
+      });
+
+      // Draw edges
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx = nodes[i].x - nodes[j].x;
+          const dy = nodes[i].y - nodes[j].y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < LINK_DIST) {
+            ctx.globalAlpha = (1 - d / LINK_DIST) * 0.25;
+            ctx.strokeStyle = '#888888';
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(nodes[i].x, nodes[i].y);
+            ctx.lineTo(nodes[j].x, nodes[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Draw nodes
+      ctx.fillStyle = '#888888';
+      ctx.globalAlpha = 0.35;
+      nodes.forEach((n) => {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.globalAlpha = 1;
+      s.frame = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    const ro = new ResizeObserver(setSize);
+    ro.observe(canvas);
+
+    return () => {
+      cancelAnimationFrame(s.frame);
+      ro.disconnect();
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      style={{
+        zIndex: 0,
+        maskImage:
+          'radial-gradient(ellipse 72% 56% at 50% 46%, black 8%, transparent 70%)',
+        WebkitMaskImage:
+          'radial-gradient(ellipse 72% 56% at 50% 46%, black 8%, transparent 70%)',
+      }}
+    />
+  );
+}
+
 /* ── Main AuthPage ── */
 export default function AuthPage({ mode }) {
   const isLogin = mode === 'login';
@@ -589,32 +699,38 @@ export default function AuthPage({ mode }) {
   return (
     <div className="h-screen overflow-hidden flex">
       {/* Left panel — fixed to viewport height, never scrolls */}
-      <div className="hidden md:flex w-1/2 h-screen bg-[#0A0A0A] text-white flex-col p-8 overflow-hidden">
-        {/* Logo */}
-        <div className="font-black text-2xl tracking-[-0.04em] shrink-0">NEXUS</div>
+      <div className="hidden md:flex w-1/2 h-screen bg-[#0A0A0A] text-white flex-col p-8 overflow-hidden relative">
+        {/* Friend graph — z-0, masked to soft ellipse behind taglines */}
+        <FriendGraph />
 
-        {/* Center taglines — flex-1 keeps this region vertically centered */}
-        <div className="flex-1 flex items-center min-h-0">
-          <div>
-            <p className="font-black text-5xl leading-tight">Connect.</p>
-            <p className="font-black text-5xl leading-tight">Share.</p>
-            <p className="font-black text-5xl leading-tight">Play.</p>
-          </div>
-        </div>
+        {/* Content — z-10 so it sits above the canvas */}
+        <div className="relative z-10 flex flex-col h-full">
+          {/* Logo */}
+          <div className="font-black text-2xl tracking-[-0.04em] shrink-0">NEXUS</div>
 
-        {/* Feature bullets — shrink-0 pins them to the bottom, never pushed off-screen */}
-        <div className="shrink-0 flex flex-col gap-3">
-          <div className="flex items-center gap-2 text-sm text-[#888888]">
-            <Users size={16} />
-            Friend graph with smart suggestions
+          {/* Center taglines — flex-1 keeps this region vertically centered */}
+          <div className="flex-1 flex items-center min-h-0">
+            <div>
+              <p className="font-black text-5xl leading-tight">Connect.</p>
+              <p className="font-black text-5xl leading-tight">Share.</p>
+              <p className="font-black text-5xl leading-tight">Play.</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-sm text-[#888888]">
-            <MessageCircle size={16} />
-            Real-time chat and group messaging
-          </div>
-          <div className="flex items-center gap-2 text-sm text-[#888888]">
-            <Gamepad2 size={16} />
-            Multiplayer games built in
+
+          {/* Feature bullets — shrink-0 pins them to the bottom, never pushed off-screen */}
+          <div className="shrink-0 flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-sm text-[#888888]">
+              <Users size={16} />
+              Friend graph with smart suggestions
+            </div>
+            <div className="flex items-center gap-2 text-sm text-[#888888]">
+              <MessageCircle size={16} />
+              Real-time chat and group messaging
+            </div>
+            <div className="flex items-center gap-2 text-sm text-[#888888]">
+              <Gamepad2 size={16} />
+              Multiplayer games built in
+            </div>
           </div>
         </div>
       </div>
