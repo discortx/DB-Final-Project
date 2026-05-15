@@ -203,12 +203,14 @@ router.post(
       const { rows: [updated] } = await client.query(
         `UPDATE tictactoe_matches SET
            board           = $2,
-           state           = $3,
-           winner_id       = $4,
+           state           = $3::game_state,
+           winner_id       = $4::bigint,
            player1_score   = $5,
            player2_score   = $6,
            total_games     = $7,
-           current_turn_id = CASE WHEN $3 = 'CONTINUE' THEN $8 ELSE current_turn_id END
+           current_turn_id = CASE WHEN $3::text = 'CONTINUE'
+                                  THEN $8::bigint
+                                  ELSE current_turn_id END
          WHERE id = $1 RETURNING *`,
         [match.id, newBoard, state, winnerId, p1Score, p2Score, total, otherId]
       );
