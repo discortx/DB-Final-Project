@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
-import { getMatch, makeMove, rematch } from '../api/games';
+import { getMatch, makeMove, proposeRematch, acceptRematch, declineRematch } from '../api/games';
 import { getUserById } from '../api/users';
 import useAuthStore from '../store/authStore';
 import useToastStore from '../store/toastStore';
@@ -86,6 +86,10 @@ export default function TicTacToePage() {
   const [confettiActive, setConfettiActive] = useState(false);
   const prevStateRef = useRef(null);
 
+  // Rematch consent state
+  const [rematchProposedByMe, setRematchProposedByMe] = useState(false);
+  const [rematchProposedByOpponent, setRematchProposedByOpponent] = useState(false);
+
   // Load match
   const loadMatch = useCallback(async () => {
     try {
@@ -115,7 +119,24 @@ export default function TicTacToePage() {
     if (match.player2_id) fetchPlayer(match.player2_id, setPlayer2);
   }, [match?.player1_id, match?.player2_id]); // eslint-disable-line
 
-  // Socket listener
+  // Derive rematch proposal state from match
+  useEffect(() => {
+    if (!match || !me) return;
+    if (!match.rematch_proposed_by) {
+      setRematchProposedByMe(false);
+      setRematchProposedByOpponent(false);
+      return;
+    }
+    if (String(match.rematch_proposed_by) === String(me.id)) {
+      setRematchProposedByMe(true);
+      setRematchProposedByOpponent(false);
+    } else {
+      setRematchProposedByMe(false);
+      setRematchProposedByOpponent(true);
+    }
+  }, [match?.rematch_proposed_by, me?.id]); // eslint-disable-line
+
+  // Socket listener — move updates
   useEffect(() => {
     const onMove = (updated) => {
       if (String(updated.id) !== String(id)) return;
@@ -124,6 +145,26 @@ export default function TicTacToePage() {
     socket.on('game:move', onMove);
     return () => socket.off('game:move', onMove);
   }, [id]);
+
+  // Socket listeners — rematch events
+  useEffect(() => {
+    const onProposed = ({ match_id }) => {
+      if (String(match_id) !== String(id)) return;
+      setRematchProposedByOpponent(true);
+      addToast({ message: 'Opponent wants a rematch!', type: 'info' });
+    };
+    const onDeclined = ({ match_id }) => {
+      if (String(match_id) !== String(id)) return;
+      setRematchProposedByMe(false);
+      addToast({ message: 'Opponent declined the rematch.', type: 'info' });
+    };
+    socket.on('rematch:proposed', onProposed);
+    socket.on('rematch:declined', onDeclined);
+    return () => {
+      socket.off('rematch:proposed', onProposed);
+      socket.off('rematch:declined', onDeclined);
+    };
+  }, [id, addToast]);
 
   // Trigger confetti when I win
   useEffect(() => {
@@ -159,14 +200,39 @@ export default function TicTacToePage() {
     }
   };
 
-  const handleRematch = async () => {
+  const handleProposeRematch = async () => {
     try {
-      const r = await rematch(id);
+      await proposeRematch(id);
+      setRematchProposedByMe(true);
+    } catch (e) {
+      addToast({
+        message: e?.response?.data?.error || 'Could not propose rematch.',
+        type: 'error',
+      });
+    }
+  };
+
+  const handleAcceptRematch = async () => {
+    try {
+      const r = await acceptRematch(id);
       setMatch(r.data);
       setError('');
     } catch (e) {
       addToast({
-        message: e?.response?.data?.error || 'Could not start rematch.',
+        message: e?.response?.data?.error || 'Could not accept rematch.',
+        type: 'error',
+      });
+    }
+  };
+
+  const handleDeclineRematch = async () => {
+    try {
+      await declineRematch(id);
+      setRematchProposedByOpponent(false);
+      navigate('/games');
+    } catch (e) {
+      addToast({
+        message: e?.response?.data?.error || 'Could not decline rematch.',
         type: 'error',
       });
     }
@@ -404,13 +470,45 @@ export default function TicTacToePage() {
 
       {/* Post-game actions */}
       {match.state !== 'CONTINUE' && (
-        <div className="flex gap-3 justify-center mt-6">
-          <Button variant="primary" onClick={handleRematch}>
-            Play Again
-          </Button>
-          <Button variant="secondary" onClick={() => navigate('/games')}>
-            Back to Games
-          </Button>
+        <div className="flex flex-col items-center gap-3 mt-6">
+
+          {/* Neither player has proposed yet */}
+          {!rematchProposedByMe && !rematchProposedByOpponent && (
+            <div className="flex gap-3">
+              <Button variant="primary" onClick={handleProposeRematch}>
+                Play Again
+              </Button>
+              <Button variant="secondary" onClick={() => navigate('/games')}>
+                Back to Games
+              </Button>
+            </div>
+          )}
+
+          {/* Current player proposed — waiting for opponent */}
+          {rematchProposedByMe && !rematchProposedByOpponent && (
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-sm text-[#888888]">Waiting for opponent to accept…</p>
+              <Button variant="secondary" onClick={() => navigate('/games')}>
+                Back to Games
+              </Button>
+            </div>
+          )}
+
+          {/* Opponent proposed — current player must respond */}
+          {rematchProposedByOpponent && !rematchProposedByMe && (
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-sm font-medium text-[#0A0A0A]">Opponent wants a rematch!</p>
+              <div className="flex gap-3">
+                <Button variant="primary" onClick={handleAcceptRematch}>
+                  Accept
+                </Button>
+                <Button variant="secondary" onClick={handleDeclineRematch}>
+                  Decline
+                </Button>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
     </div>

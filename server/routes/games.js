@@ -230,27 +230,99 @@ router.post(
   }
 );
 
-// POST /api/games/matches/:id/rematch
-router.post('/matches/:id/rematch', auth, async (req, res) => {
-  const { rows: [match] } = await pool.query(`SELECT * FROM tictactoe_matches WHERE id = $1`, [req.params.id]);
+// POST /api/games/matches/:id/rematch-propose
+router.post('/matches/:id/rematch-propose', auth, async (req, res) => {
+  const { rows: [match] } = await pool.query(
+    `SELECT * FROM tictactoe_matches WHERE id = $1`, [req.params.id]
+  );
   if (!match) return res.status(404).json({ error: 'Match not found' });
-  if (String(match.player1_id) !== String(req.user.id) && String(match.player2_id) !== String(req.user.id)) {
-    return res.status(403).json({ error: 'Not a participant' });
+  if (
+    String(match.player1_id) !== String(req.user.id) &&
+    String(match.player2_id) !== String(req.user.id)
+  ) return res.status(403).json({ error: 'Not a participant' });
+  if (match.state === 'CONTINUE') {
+    return res.status(400).json({ error: 'Game still in progress' });
   }
-  if (match.state === 'CONTINUE') return res.status(400).json({ error: 'Game still in progress' });
 
-  const nextTurn = String(match.current_turn_id) === String(match.player1_id) ? match.player2_id : match.player1_id;
+  const { rows: [updated] } = await pool.query(
+    `UPDATE tictactoe_matches SET rematch_proposed_by = $2
+     WHERE id = $1 RETURNING *`,
+    [req.params.id, req.user.id]
+  );
+
+  // Notify the OTHER player via socket
+  const otherId =
+    String(match.player1_id) === String(req.user.id)
+      ? match.player2_id
+      : match.player1_id;
+
+  const io = getIo();
+  if (io) {
+    io.to(`user:${otherId}`).emit('rematch:proposed', {
+      match_id: match.id,
+      proposed_by: req.user.id,
+    });
+  }
+
+  res.json(updated);
+});
+
+// POST /api/games/matches/:id/rematch-accept
+router.post('/matches/:id/rematch-accept', auth, async (req, res) => {
+  const { rows: [match] } = await pool.query(
+    `SELECT * FROM tictactoe_matches WHERE id = $1`, [req.params.id]
+  );
+  if (!match) return res.status(404).json({ error: 'Match not found' });
+  if (
+    String(match.player1_id) !== String(req.user.id) &&
+    String(match.player2_id) !== String(req.user.id)
+  ) return res.status(403).json({ error: 'Not a participant' });
+  if (!match.rematch_proposed_by) {
+    return res.status(400).json({ error: 'No rematch proposed' });
+  }
+  if (String(match.rematch_proposed_by) === String(req.user.id)) {
+    return res.status(400).json({ error: 'Cannot accept your own proposal' });
+  }
+
+  const nextTurn =
+    String(match.current_turn_id) === String(match.player1_id)
+      ? match.player2_id
+      : match.player1_id;
+
   const { rows: [updated] } = await pool.query(
     `UPDATE tictactoe_matches
-     SET board = '---------', state = 'CONTINUE', winner_id = NULL, current_turn_id = $2
+     SET board = '---------', state = 'CONTINUE'::game_state, winner_id = NULL,
+         current_turn_id = $2::bigint, rematch_proposed_by = NULL
      WHERE id = $1 RETURNING *`,
-    [match.id, nextTurn]
+    [req.params.id, nextTurn]
   );
 
   const io = getIo();
   if (io) io.to(`match:${match.id}`).emit('game:move', updated);
 
   res.json(updated);
+});
+
+// POST /api/games/matches/:id/rematch-decline
+router.post('/matches/:id/rematch-decline', auth, async (req, res) => {
+  const { rows: [match] } = await pool.query(
+    `SELECT * FROM tictactoe_matches WHERE id = $1`, [req.params.id]
+  );
+  if (!match) return res.status(404).json({ error: 'Match not found' });
+
+  await pool.query(
+    `UPDATE tictactoe_matches SET rematch_proposed_by = NULL WHERE id = $1`,
+    [req.params.id]
+  );
+
+  const io = getIo();
+  if (io) {
+    io.to(`match:${match.id}`).emit('rematch:declined', {
+      match_id: match.id,
+    });
+  }
+
+  res.json({ ok: true });
 });
 
 // POST /api/games/snake/score
