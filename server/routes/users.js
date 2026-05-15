@@ -21,11 +21,13 @@ const SAFE_COLS = 'id, username, email, first_name, last_name, date_of_birth, bi
 router.get('/online', auth, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT u.id, u.username, u.first_name, u.last_name, op.last_seen_at
-     FROM online_presence op
-     JOIN users u ON u.id = op.user_id
+     FROM users u
+     JOIN online_presence op ON op.user_id = u.id
      JOIN friendships f
-       ON f.user_id = LEAST($1::bigint, u.id) AND f.friend_id = GREATEST($1::bigint, u.id)
-     WHERE u.id <> $1 AND u.privacy_enabled IS NOT TRUE`,
+       ON (f.user_id = $1 AND f.friend_id = u.id)
+       OR (f.friend_id = $1 AND f.user_id = u.id)
+     WHERE u.id <> $1
+       AND u.privacy_enabled IS NOT TRUE`,
     [req.user.id]
   );
   res.json(rows);
