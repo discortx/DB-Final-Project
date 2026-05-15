@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowRight, X, Edit2, Plus } from 'lucide-react';
-import { getChat, updateChat, addMember, removeMember } from '../api/chats';
+import { getChat, updateChat, addMember, removeMember, updateMemberRole } from '../api/chats';
 import { getMessages, sendMessage } from '../api/messages';
 import { searchUsers } from '../api/users';
 import useAuthStore from '../store/authStore';
@@ -98,7 +98,13 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated }) {
   const [addQuery, setAddQuery] = useState('');
   const [addResults, setAddResults] = useState([]);
   const [showAddSearch, setShowAddSearch] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(null); // uid being changed
   const debouncedAdd = useDebounce(addQuery, 300);
+
+  // Derive admin status from the member list role field
+  const isAdmin = (chat?.members || []).some(
+    (m) => String(m.id) === String(currentUserId) && m.role === 'ADMIN'
+  );
   const isCreator = chat?.creator_id === currentUserId;
 
   useEffect(() => {
@@ -149,6 +155,21 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated }) {
       addToast({ message: `${member.first_name} removed`, type: 'success' });
     } catch {
       addToast({ message: 'Failed to remove member', type: 'error' });
+    }
+  };
+
+  const handleChangeRole = async (member, newRole) => {
+    setRoleLoading(member.id);
+    try {
+      await updateMemberRole(chat.id, member.id, newRole);
+      const r = await getChat(chat.id);
+      onChatUpdated(r.data);
+      const label = newRole === 'ADMIN' ? 'promoted to Admin' : 'demoted to Member';
+      addToast({ message: `${member.first_name} ${label}`, type: 'success' });
+    } catch {
+      addToast({ message: 'Failed to update role', type: 'error' });
+    } finally {
+      setRoleLoading(null);
     }
   };
 
@@ -216,7 +237,7 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated }) {
                 <span className="text-lg font-semibold text-[#0A0A0A] flex-1 truncate">
                   {chat?.name || 'Group Chat'}
                 </span>
-                {isCreator && (
+                {isAdmin && (
                   <button
                     type="button"
                     onClick={() => setEditing(true)}
@@ -246,28 +267,49 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated }) {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[#0A0A0A] truncate font-medium">
                       {member.first_name} {member.last_name}
-                      {chat.creator_id === member.id && (
+                      {/* Show Admin badge based on role field */}
+                      {member.role === 'ADMIN' && (
                         <Badge variant="muted" className="ml-1">Admin</Badge>
                       )}
                     </p>
                     <p className="text-xs text-[#888888] truncate">@{member.username}</p>
                   </div>
-                  {isCreator && member.id !== currentUserId && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMember(member)}
-                      className="p-1 rounded-md hover:bg-[#EFEFEF] transition-colors text-[#CC0000] shrink-0"
-                      aria-label={`Remove ${member.first_name}`}
-                    >
-                      <X size={14} />
-                    </button>
+                  {/* Admin actions for other members */}
+                  {isAdmin && String(member.id) !== String(currentUserId) && (
+                    <div className="flex items-center gap-1">
+                      {/* Promote / Demote toggle */}
+                      <button
+                        type="button"
+                        disabled={roleLoading === member.id}
+                        onClick={() =>
+                          handleChangeRole(
+                            member,
+                            member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN'
+                          )
+                        }
+                        className="p-1 rounded-md hover:bg-[#EFEFEF] transition-colors text-[#888888] text-[10px] font-semibold shrink-0"
+                        aria-label={member.role === 'ADMIN' ? `Demote ${member.first_name}` : `Promote ${member.first_name}`}
+                        title={member.role === 'ADMIN' ? 'Demote to Member' : 'Promote to Admin'}
+                      >
+                        {roleLoading === member.id ? '…' : member.role === 'ADMIN' ? '↓' : '↑'}
+                      </button>
+                      {/* Remove */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMember(member)}
+                        className="p-1 rounded-md hover:bg-[#EFEFEF] transition-colors text-[#CC0000] shrink-0"
+                        aria-label={`Remove ${member.first_name}`}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
             </div>
 
-            {/* Add member */}
-            {isCreator && (
+            {/* Add member — visible to all admins */}
+            {isAdmin && (
               <div className="mt-2">
                 {showAddSearch ? (
                   <div className="relative">
