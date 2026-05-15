@@ -43,7 +43,7 @@ export default function AppShell() {
         </div>
 
         {/* Main content */}
-        <main className="flex-1 min-w-0 overflow-y-auto bg-white">
+        <main className="flex-1 min-w-0 overflow-y-scroll overflow-x-hidden bg-white [scrollbar-gutter:stable]">
           <div className="max-w-5xl mx-auto px-4 py-6">
             <Outlet />
           </div>
