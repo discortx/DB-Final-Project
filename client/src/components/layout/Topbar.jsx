@@ -100,8 +100,8 @@ export default function Topbar() {
       <header className="h-14 bg-white border-b border-[#E0E0E0] px-4 flex items-center">
         {/* LEFT */}
         <div className="w-[200px] shrink-0">
-          <Link to="/" className="text-xl font-black tracking-[-0.04em] text-black select-none">
-            NEXUS
+          <Link to="/" className="text-xl font-black tracking-tighter text-[#0A0A0A] select-none font-sans">
+            SORA LINK
           </Link>
         </div>
 
@@ -116,7 +116,7 @@ export default function Topbar() {
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => searchResults.length > 0 && setSearchOpen(true)}
             onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
-            placeholder="Search Nexus…"
+            placeholder="Search Sora Link…"
             className="w-full pl-9 pr-3 py-1.5 bg-[#F7F7F7] border border-[#E0E0E0] rounded-md text-sm
                        focus:bg-white focus:border-black focus:ring-1 focus:ring-black focus:outline-none
                        transition-colors"

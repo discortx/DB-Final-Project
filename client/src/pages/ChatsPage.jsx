@@ -30,6 +30,7 @@ function NewDMModal({ open, onClose, onCreated }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const debouncedQuery = useDebounce(query, 300);
+  const addToast = useToastStore((s) => s.addToast);
 
   useEffect(() => {
     if (!debouncedQuery.trim()) { setResults([]); return; }
@@ -50,7 +51,7 @@ function NewDMModal({ open, onClose, onCreated }) {
       const r = await openDm(user.id);
       onCreated(r.data.id);
     } catch {
-      // ignore
+      addToast({ message: 'Could not open chat.', type: 'error' });
     }
   };
 

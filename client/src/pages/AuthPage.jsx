@@ -238,7 +238,7 @@ function LoginForm() {
 
           {/* Footer */}
           <p className="login-rise login-rise-5 text-center text-xs text-[#888888] pt-2">
-            New to Nexus?{' '}
+            New to Sora Link?{' '}
             <Link
               to="/register"
               className="font-semibold text-[#0A0A0A] hover:underline transition-colors"
@@ -739,7 +739,7 @@ export default function AuthPage({ mode }) {
         {/* Content — z-10 so it sits above the canvas */}
         <div className="relative z-10 flex flex-col h-full">
           {/* Logo */}
-          <div className="font-black text-2xl tracking-[-0.04em] shrink-0">NEXUS</div>
+          <div className="font-black text-2xl tracking-tighter text-[#0A0A0A] shrink-0 font-sans">SORA LINK</div>
 
           {/* Center taglines — each word triggers a different graph state */}
           <div className="flex-1 flex items-center min-h-0">

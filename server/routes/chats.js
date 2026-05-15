@@ -29,7 +29,7 @@ router.get('/', auth, async (req, res) => {
 });
 
 // POST /api/chats/dm
-router.post('/dm', auth, validate(z.object({ user_id: z.number().int().positive() })), async (req, res) => {
+router.post('/dm', auth, validate(z.object({ user_id: z.coerce.number().int().positive() })), async (req, res) => {
   const otherId = req.body.user_id;
 
   const { rows: existing } = await pool.query(

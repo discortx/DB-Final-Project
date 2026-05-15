@@ -107,9 +107,9 @@ export default function LeftSidebar() {
       <div className="mt-auto">
         <Divider className="mb-4" />
 
-        {/* Nexus Pro promo card */}
+        {/* Sora Link Pro promo card */}
         <div className="border border-black rounded-lg p-3">
-          <p className="text-xs font-bold text-[#0A0A0A] mb-1">NEXUS PRO</p>
+          <p className="text-xs font-bold text-[#0A0A0A] mb-1">SORA LINK PRO</p>
           <p className="text-xs text-[#888888] mb-2">
             Unlock analytics, custom themes &amp; more.
           </p>

@@ -26,7 +26,7 @@ const VISIBILITY_OPTIONS = [
     value: 'PUBLIC',
     label: 'Public',
     icon: Globe,
-    desc: 'Anyone on Nexus can see this post.',
+    desc: 'Anyone on Sora Link can see this post.',
   },
 ];
 
