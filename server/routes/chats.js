@@ -19,9 +19,15 @@ router.get('/', auth, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT c.id, c.type, c.name, c.description, c.created_at,
             (SELECT m.content    FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
-            (SELECT m.created_at FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message_at
+            (SELECT m.created_at FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message_at,
+            ou.id         AS other_user_id,
+            ou.first_name AS other_first_name,
+            ou.last_name  AS other_last_name,
+            ou.username   AS other_username
      FROM chats c
      JOIN chat_members cm ON cm.chat_id = c.id AND cm.user_id = $1
+     LEFT JOIN chat_members cm2 ON cm2.chat_id = c.id AND cm2.user_id <> $1 AND c.type = 'DM'
+     LEFT JOIN users ou ON ou.id = cm2.user_id
      ORDER BY last_message_at DESC NULLS LAST`,
     [req.user.id]
   );

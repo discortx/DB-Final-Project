@@ -16,7 +16,12 @@ function relativeTime(dateStr) {
 export default function ChatListItem({ chat, isActive, onClick }) {
   const otherMember =
     chat.type === 'DM'
-      ? (chat.members || []).find((m) => m.id !== undefined) || {}
+      ? {
+          id:         chat.other_user_id,
+          first_name: chat.other_first_name,
+          last_name:  chat.other_last_name,
+          username:   chat.other_username,
+        }
       : null;
 
   const timestamp = chat.last_message_at || chat.created_at || null;
