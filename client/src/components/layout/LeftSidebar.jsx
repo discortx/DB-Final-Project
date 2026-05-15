@@ -1,24 +1,16 @@
 import { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import {
   Home, User, Users, MessageCircle,
-  Bell, Gamepad2,
+  Gamepad2,
 } from 'lucide-react';
-import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
-import Button from '../ui/Button';
-import Divider from '../ui/Divider';
 import useAuthStore from '../../store/authStore';
-import useNotifStore from '../../store/notifStore';
-import useToastStore from '../../store/toastStore';
 import { getInbox } from '../../api/friends';
 import socket from '../../socket';
 
 export default function LeftSidebar() {
-  const navigate   = useNavigate();
   const user       = useAuthStore((s) => s.user);
-  const addToast   = useToastStore((s) => s.addToast);
-  const unreadCount = useNotifStore((s) => s.unreadCount);
 
   const [pendingCount, setPendingCount] = useState(0);
 
@@ -48,32 +40,11 @@ export default function LeftSidebar() {
     { icon: User,          label: 'Profile',        to: `/profile/${user?.id}`, end: false, badge: null     },
     { icon: Users,         label: 'Friends',        to: '/friends',           end: false, badge: pendingCount },
     { icon: MessageCircle, label: 'Messages',       to: '/chats',             end: false, badge: null        },
-    { icon: Bell,          label: 'Notifications',  to: '/notifications',     end: false, badge: unreadCount },
     { icon: Gamepad2,      label: 'Games',          to: '/games',             end: false, badge: null        },
   ];
 
   return (
     <aside className="bg-[#F7F7F7] border-r border-[#E0E0E0] pt-4 px-3 pb-6 flex flex-col w-full h-full">
-      {/* User mini-card */}
-      <div className="flex items-center gap-3 px-2 py-2 mb-4">
-        <Avatar firstName={user?.first_name} lastName={user?.last_name} size="md" />
-        <div className="min-w-0">
-          <p className="font-semibold text-sm text-[#0A0A0A] truncate">
-            {user?.first_name} {user?.last_name}
-          </p>
-          <p className="text-xs text-[#888888] truncate">@{user?.username}</p>
-          <button
-            type="button"
-            onClick={() => navigate(`/profile/${user?.id}`)}
-            className="text-xs text-[#888888] hover:text-black hover:underline mt-0.5 leading-none"
-          >
-            Edit Profile
-          </button>
-        </div>
-      </div>
-
-      <Divider className="my-2" />
-
       {/* Section label */}
       <p className="text-[10px] font-bold tracking-widest text-[#888888] px-3 mb-1 uppercase">
         Menu
@@ -102,27 +73,6 @@ export default function LeftSidebar() {
           </NavLink>
         ))}
       </nav>
-
-      {/* Push to bottom */}
-      <div className="mt-auto">
-        <Divider className="mb-4" />
-
-        {/* Nexus Pro promo card */}
-        <div className="border border-black rounded-lg p-3">
-          <p className="text-xs font-bold text-[#0A0A0A] mb-1">NEXUS PRO</p>
-          <p className="text-xs text-[#888888] mb-2">
-            Unlock analytics, custom themes &amp; more.
-          </p>
-          <Button
-            variant="primary"
-            size="sm"
-            className="w-full text-xs"
-            onClick={() => addToast({ message: 'Coming soon!', type: 'info' })}
-          >
-            Upgrade →
-          </Button>
-        </div>
-      </div>
     </aside>
   );
 }
