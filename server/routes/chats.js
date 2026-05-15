@@ -187,13 +187,19 @@ router.patch(
 router.post(
   '/:id/members',
   auth,
-  validate(z.object({ user_id: z.number().int().positive() })),
+  validate(z.object({ user_id: z.coerce.number().int().positive() })),
   async (req, res) => {
-    if (!(await isMember(req.params.id, req.user.id))) {
-      return res.status(403).json({ error: 'Not a member' });
+    if (!(await isAdmin(req.params.id, req.user.id))) {
+      return res.status(403).json({ error: 'Only admins can add members' });
     }
+
+    // Check for duplicate
+    if (await isMember(req.params.id, req.body.user_id)) {
+      return res.status(400).json({ error: 'User is already a member' });
+    }
+
     await pool.query(
-      `INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      `INSERT INTO chat_members (chat_id, user_id, role) VALUES ($1, $2, 'MEMBER') ON CONFLICT DO NOTHING`,
       [req.params.id, req.body.user_id]
     );
     res.json({ ok: true });

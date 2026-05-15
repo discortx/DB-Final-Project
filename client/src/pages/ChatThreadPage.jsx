@@ -142,8 +142,10 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated, onL
       setAddResults([]);
       setShowAddSearch(false);
       addToast({ message: `${user.first_name} added to group`, type: 'success' });
-    } catch {
-      addToast({ message: 'Failed to add member', type: 'error' });
+    } catch (err) {
+      console.error('[handleAddMember] error:', err);
+      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to add member';
+      addToast({ message: String(msg), type: 'error' });
     }
   };
 
