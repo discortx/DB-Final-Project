@@ -70,6 +70,49 @@ router.get('/search', auth, async (req, res) => {
   res.json(rows);
 });
 
+// GET /api/users/:id/posts
+router.get('/:id/posts', auth, async (req, res) => {
+  const profileId = req.params.id;
+  const viewerId  = req.user.id;
+
+  const { rows } = await pool.query(
+    `SELECT p.id, p.content, p.visibility, p.created_at, p.updated_at,
+            u.id AS author_id, u.username, u.first_name, u.last_name,
+            COUNT(DISTINCT l.user_id)::int AS like_count,
+            COUNT(DISTINCT c.id)::int      AS comment_count,
+            EXISTS(SELECT 1 FROM likes WHERE post_id = p.id AND user_id = $2) AS liked_by_me,
+            COALESCE(
+              json_agg(
+                DISTINCT jsonb_build_object(
+                  'id', c2.id, 'content', c2.content,
+                  'author_id', c2.author_id, 'created_at', c2.created_at
+                )
+              ) FILTER (WHERE c2.id IS NOT NULL),
+              '[]'
+            ) AS comments
+     FROM posts p
+     JOIN users u ON u.id = p.author_id
+     LEFT JOIN likes    l  ON l.post_id = p.id
+     LEFT JOIN comments c  ON c.post_id = p.id
+     LEFT JOIN comments c2 ON c2.post_id = p.id
+     WHERE p.author_id = $1
+       AND (
+         $1::bigint = $2::bigint
+         OR p.visibility = 'PUBLIC'
+         OR EXISTS (
+           SELECT 1 FROM friendships
+           WHERE user_id = LEAST($1::bigint, $2::bigint)
+             AND friend_id = GREATEST($1::bigint, $2::bigint)
+         )
+       )
+     GROUP BY p.id, u.id
+     ORDER BY p.created_at DESC`,
+    [profileId, viewerId]
+  );
+
+  res.json(rows);
+});
+
 router.get('/:id', auth, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT id, username, first_name, last_name, bio, gender, privacy_enabled, created_at

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Cake, Venus, Mars } from 'lucide-react';
-import { getMe, updateMe, getUserById } from '../api/users';
+import { getMe, updateMe, getUserById, getUserPosts } from '../api/users';
 import {
   getFriends,
   getInbox,
@@ -21,6 +21,7 @@ import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
 import Skeleton from '../components/ui/Skeleton';
 import { SkeletonAvatar } from '../components/ui/Skeleton';
+import PostCard from '../components/feed/PostCard';
 
 function formatMemberDate(dateStr) {
   if (!dateStr) return '—';
@@ -232,6 +233,21 @@ export default function ProfilePage() {
   const [privacyLoading, setPrivacyLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [messageLoading, setMessageLoading] = useState(false);
+
+  const [posts, setPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(true);
+
+  // Use the actual numeric ID — never the string "me" — so the backend route gets a real user ID.
+  const profileUserId = isOwnProfile ? me?.id : id;
+
+  useEffect(() => {
+    if (!profileUserId) return;
+    setPostsLoading(true);
+    getUserPosts(profileUserId)
+      .then((r) => setPosts(r.data || []))
+      .catch(() => setPosts([]))
+      .finally(() => setPostsLoading(false));
+  }, [profileUserId]);
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -510,7 +526,7 @@ export default function ProfilePage() {
         {/* Stats row */}
         <div className="border-t border-[#E0E0E0] pt-4 mt-4 flex gap-8">
           <div className="flex flex-col items-center">
-            <span className="font-bold text-lg text-[#0A0A0A]">—</span>
+            <span className="font-bold text-lg text-[#0A0A0A]">{postsLoading ? '—' : posts.length}</span>
             <span className="text-xs text-[#888888]">Posts</span>
           </div>
           <div className="flex flex-col items-center">
@@ -550,10 +566,27 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* Posts placeholder */}
-      <div className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-6 text-center">
-        <p className="text-sm text-[#888888]">Posts are visible on the main feed.</p>
-      </div>
+      {/* Posts */}
+      {postsLoading ? (
+        <div className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-6 text-center">
+          <p className="text-sm text-[#888888]">Loading posts…</p>
+        </div>
+      ) : posts.length === 0 ? (
+        <div className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-6 text-center">
+          <p className="text-sm text-[#888888]">No posts yet.</p>
+        </div>
+      ) : (
+        <div>
+          {posts.map((post) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              onDelete={(pid) => setPosts((prev) => prev.filter((p) => p.id !== pid))}
+              onUpdate={(updated) => setPosts((prev) => prev.map((p) => p.id === updated.id ? updated : p))}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Edit Profile Modal */}
       <EditProfileModal
