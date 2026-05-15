@@ -72,7 +72,7 @@ router.post(
   validate(z.object({
     name:        z.string().min(1).max(255),
     description: z.string().max(1000).optional(),
-    member_ids:  z.array(z.number().int().positive()).min(1),
+    member_ids:  z.array(z.coerce.number().int().positive()).min(1),
   })),
   async (req, res) => {
     const { name, description, member_ids } = req.body;
@@ -93,7 +93,8 @@ router.post(
       res.status(201).json(chat);
     } catch (e) {
       await client.query('ROLLBACK');
-      throw e;
+      console.error('[POST /chats/group] error:', e);
+      res.status(500).json({ error: e?.message || 'Failed to create group chat' });
     } finally {
       client.release();
     }
