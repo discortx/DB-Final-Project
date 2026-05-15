@@ -40,13 +40,21 @@ export default function FriendCard({ friend, onUnfriend }) {
   const [unfriending, setUnfriending] = useState(false);
   const [messaging, setMessaging] = useState(false);
 
-  const handleMessage = async () => {
+  const handleMessage = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     setMessaging(true);
     try {
       const res = await openDm(friend.id);
-      navigate(`/chats/${res.data.id}`);
+      const chatId = res?.data?.id;
+      if (chatId) {
+        navigate(`/chats/${chatId}`);
+      } else {
+        throw new Error("Chat ID not received from backend");
+      }
     } catch (err) {
-      addToast({ message: err.response?.data?.error || 'Something went wrong', type: 'error' });
+      console.error("Failed to open DM:", err);
+      addToast({ message: err?.response?.data?.error || 'Something went wrong', type: 'error' });
     } finally {
       setMessaging(false);
     }
