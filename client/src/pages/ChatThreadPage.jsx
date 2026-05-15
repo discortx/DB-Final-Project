@@ -306,7 +306,7 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated, onL
                       </button>
                       
                       {openDropdownId === member.id && (
-                        <div className="absolute right-0 top-full mt-1 w-40 bg-bg border border-border shadow-sm rounded-md z-50 py-1">
+                        <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-border shadow-sm rounded-md z-50 py-1">
                           <button
                             type="button"
                             disabled={roleLoading === member.id}
