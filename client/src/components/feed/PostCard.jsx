@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ThumbsUp, MessageSquare, Share2, MoreHorizontal, Globe, Users,
 } from 'lucide-react';
@@ -157,21 +158,25 @@ export default function PostCard({ post, onDelete, onUpdate }) {
     <div className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-4 hover:shadow-sm transition-shadow mb-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-3 min-w-0">
+        <Link
+          to={`/profile/${localPost.author_id}`}
+          className="flex items-center gap-3 min-w-0 group"
+          onClick={(e) => e.stopPropagation()}
+        >
           <Avatar
             firstName={localPost.first_name}
             lastName={localPost.last_name}
             size="md"
           />
           <div className="min-w-0">
-            <p className="font-semibold text-sm text-[#0A0A0A] truncate">
+            <p className="font-semibold text-sm text-[#0A0A0A] truncate group-hover:underline">
               {localPost.first_name} {localPost.last_name}
             </p>
             <p className="text-xs text-[#888888]">
               @{localPost.username} · {timeAgo(localPost.created_at)}
             </p>
           </div>
-        </div>
+        </Link>
 
         {/* Right header section */}
         <div className="flex items-center gap-2 shrink-0">

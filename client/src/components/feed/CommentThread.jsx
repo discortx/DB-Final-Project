@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ArrowRight, Trash2 } from 'lucide-react';
 import Avatar from '../ui/Avatar';
 import useAuthStore from '../../store/authStore';
@@ -66,9 +67,13 @@ export default function CommentThread({ postId, comments = [], onCommentAdded, o
             />
             <div className="flex-1 min-w-0">
               <div className="bg-white rounded-md px-2.5 py-1.5 inline-block max-w-full">
-                <span className="font-semibold text-xs text-[#0A0A0A] mr-1">
+                <Link
+                  to={`/profile/${c.author_id}`}
+                  className="font-semibold text-xs text-[#0A0A0A] mr-1 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {c.first_name || c.author_first_name} {c.last_name || c.author_last_name}
-                </span>
+                </Link>
                 <span className="text-sm text-[#0A0A0A] break-words">{c.content}</span>
               </div>
               <p className="text-[10px] text-[#888888] mt-0.5 pl-1">
