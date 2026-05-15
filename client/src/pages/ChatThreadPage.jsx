@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, X, Edit2, Plus } from 'lucide-react';
+import { ArrowRight, X, Edit2, Plus, MoreVertical } from 'lucide-react';
 import { getChat, updateChat, addMember, removeMember, updateMemberRole } from '../api/chats';
 import { getMessages, sendMessage } from '../api/messages';
 import { searchUsers } from '../api/users';
@@ -100,6 +100,13 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated, onL
   const [showAddSearch, setShowAddSearch] = useState(false);
   const [roleLoading, setRoleLoading] = useState(null); // uid being changed
   const debouncedAdd = useDebounce(addQuery, 300);
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdownId(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   // Derive admin status from the member list role field
   const isAdmin = (chat?.members || []).some(
@@ -285,32 +292,47 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated, onL
                   </div>
                   {/* Admin actions for other members */}
                   {isAdmin && String(member.id) !== String(currentUserId) && (
-                    <div className="flex items-center gap-1">
-                      {/* Promote / Demote toggle */}
+                    <div className="relative">
                       <button
                         type="button"
-                        disabled={roleLoading === member.id}
-                        onClick={() =>
-                          handleChangeRole(
-                            member,
-                            member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN'
-                          )
-                        }
-                        className="p-1 rounded-md hover:bg-[#EFEFEF] transition-colors text-[#888888] text-[10px] font-semibold shrink-0"
-                        aria-label={member.role === 'ADMIN' ? `Demote ${member.first_name}` : `Promote ${member.first_name}`}
-                        title={member.role === 'ADMIN' ? 'Demote to Member' : 'Promote to Admin'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDropdownId(openDropdownId === member.id ? null : member.id);
+                        }}
+                        className="p-1 rounded-md hover:bg-[#EFEFEF] transition-colors text-[#888888] shrink-0"
+                        aria-label="Member options"
                       >
-                        {roleLoading === member.id ? '…' : member.role === 'ADMIN' ? '↓' : '↑'}
+                        <MoreVertical size={16} />
                       </button>
-                      {/* Remove */}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveMember(member)}
-                        className="p-1 rounded-md hover:bg-[#EFEFEF] transition-colors text-[#CC0000] shrink-0"
-                        aria-label={`Remove ${member.first_name}`}
-                      >
-                        <X size={14} />
-                      </button>
+                      
+                      {openDropdownId === member.id && (
+                        <div className="absolute right-0 top-full mt-1 w-40 bg-bg border border-border shadow-sm rounded-md z-50 py-1">
+                          <button
+                            type="button"
+                            disabled={roleLoading === member.id}
+                            onClick={() => {
+                              handleChangeRole(
+                                member,
+                                member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN'
+                              );
+                              setOpenDropdownId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-surface-2 transition-colors"
+                          >
+                            {roleLoading === member.id ? 'Updating...' : member.role === 'ADMIN' ? 'Demote to Member' : 'Promote to Admin'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleRemoveMember(member);
+                              setOpenDropdownId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-surface-2 transition-colors text-danger"
+                          >
+                            Remove from Group
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
