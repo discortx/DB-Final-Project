@@ -49,9 +49,9 @@ router.get('/invites/sent', auth, async (req, res) => {
 router.post(
   '/invites',
   auth,
-  validate(z.object({ receiver_id: z.number().int().positive() })),
+  validate(z.object({ receiver_id: z.coerce.number().int().positive() })),
   async (req, res) => {
-    if (req.body.receiver_id === req.user.id) {
+    if (String(req.body.receiver_id) === String(req.user.id)) {
       return res.status(400).json({ error: 'Cannot invite yourself' });
     }
     const { rows } = await pool.query(
@@ -134,7 +134,7 @@ router.get('/matches/:id', auth, async (req, res) => {
     [req.params.id]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Match not found' });
-  if (rows[0].player1_id !== req.user.id && rows[0].player2_id !== req.user.id) {
+  if (String(rows[0].player1_id) !== String(req.user.id) && String(rows[0].player2_id) !== String(req.user.id)) {
     return res.status(403).json({ error: 'Not a participant' });
   }
   res.json(rows[0]);
@@ -158,7 +158,7 @@ router.post(
         await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Match not found' });
       }
-      if (match.player1_id !== req.user.id && match.player2_id !== req.user.id) {
+      if (String(match.player1_id) !== String(req.user.id) && String(match.player2_id) !== String(req.user.id)) {
         await client.query('ROLLBACK');
         return res.status(403).json({ error: 'Not a participant' });
       }
@@ -166,7 +166,7 @@ router.post(
         await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Game already ended' });
       }
-      if (match.current_turn_id !== req.user.id) {
+      if (String(match.current_turn_id) !== String(req.user.id)) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Not your turn' });
       }
@@ -178,7 +178,7 @@ router.post(
         return res.status(400).json({ error: 'Cell already taken' });
       }
 
-      const myMark  = match.player1_id === req.user.id ? match.player1_mark : match.player2_mark;
+      const myMark  = String(match.player1_id) === String(req.user.id) ? match.player1_mark : match.player2_mark;
       board[position] = myMark;
       const newBoard  = board.join('');
 
@@ -191,14 +191,14 @@ router.post(
       if (checkWin(newBoard, myMark)) {
         state    = 'WIN';
         winnerId = req.user.id;
-        if (req.user.id === match.player1_id) p1Score++; else p2Score++;
+        if (String(req.user.id) === String(match.player1_id)) p1Score++; else p2Score++;
         total++;
       } else if (!newBoard.includes('-')) {
         state = 'DRAW';
         total++;
       }
 
-      const otherId = match.player1_id === req.user.id ? match.player2_id : match.player1_id;
+      const otherId = String(match.player1_id) === String(req.user.id) ? match.player2_id : match.player1_id;
 
       const { rows: [updated] } = await client.query(
         `UPDATE tictactoe_matches SET
@@ -232,12 +232,12 @@ router.post(
 router.post('/matches/:id/rematch', auth, async (req, res) => {
   const { rows: [match] } = await pool.query(`SELECT * FROM tictactoe_matches WHERE id = $1`, [req.params.id]);
   if (!match) return res.status(404).json({ error: 'Match not found' });
-  if (match.player1_id !== req.user.id && match.player2_id !== req.user.id) {
+  if (String(match.player1_id) !== String(req.user.id) && String(match.player2_id) !== String(req.user.id)) {
     return res.status(403).json({ error: 'Not a participant' });
   }
   if (match.state === 'CONTINUE') return res.status(400).json({ error: 'Game still in progress' });
 
-  const nextTurn = match.current_turn_id === match.player1_id ? match.player2_id : match.player1_id;
+  const nextTurn = String(match.current_turn_id) === String(match.player1_id) ? match.player2_id : match.player1_id;
   const { rows: [updated] } = await pool.query(
     `UPDATE tictactoe_matches
      SET board = '---------', state = 'CONTINUE', winner_id = NULL, current_turn_id = $2

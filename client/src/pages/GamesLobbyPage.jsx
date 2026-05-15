@@ -278,10 +278,8 @@ export default function GamesLobbyPage() {
       // Fix 1 — refresh sent invites list so the new row appears immediately
       loadSentInvites();
     } catch (err) {
-      addToast({
-        message: err?.response?.data?.error || 'Could not send invite.',
-        type: 'error',
-      });
+      const msg = err?.response?.data?.error || err?.message || 'Could not send invite.';
+      addToast({ message: String(msg), type: 'error' });
     } finally {
       setSendingInviteTo(null);
     }
