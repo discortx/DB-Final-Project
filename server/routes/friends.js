@@ -59,7 +59,7 @@ router.get('/suggestions', auth, async (req, res) => {
 router.post(
   '/requests',
   auth,
-  validate(z.object({ receiver_id: z.number().int().positive() })),
+  validate(z.object({ receiver_id: z.coerce.number().int().positive() })),
   async (req, res) => {
     const { receiver_id } = req.body;
     if (receiver_id === req.user.id) {
