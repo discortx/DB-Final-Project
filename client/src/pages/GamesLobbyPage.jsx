@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Gamepad2, ChevronRight } from 'lucide-react';
+import { Gamepad2, ChevronRight, Clock, CheckCircle, XCircle } from 'lucide-react';
 import {
   getPendingInvites,
+  getSentInvites,
   sendInvite,
   acceptInvite,
   rejectInvite,
@@ -11,6 +12,7 @@ import {
 import { getFriends } from '../api/friends';
 import useAuthStore from '../store/authStore';
 import useToastStore from '../store/toastStore';
+import socket from '../socket';
 import Tabs from '../components/ui/Tabs';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
@@ -174,8 +176,10 @@ export default function GamesLobbyPage() {
 
   // Data
   const [invites, setInvites] = useState([]);
+  const [sentInvites, setSentInvites] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [loadingInvites, setLoadingInvites] = useState(false);
+  const [loadingSentInvites, setLoadingSentInvites] = useState(false);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
 
   // Invite modal
@@ -187,6 +191,23 @@ export default function GamesLobbyPage() {
 
   // Accept / decline loading
   const [actionId, setActionId] = useState(null);
+
+  // Helpers to (re)load lists
+  const loadPendingInvites = useCallback(() => {
+    setLoadingInvites(true);
+    getPendingInvites()
+      .then((r) => setInvites(r.data || []))
+      .catch(() => setInvites([]))
+      .finally(() => setLoadingInvites(false));
+  }, []);
+
+  const loadSentInvites = useCallback(() => {
+    setLoadingSentInvites(true);
+    getSentInvites()
+      .then((r) => setSentInvites(r.data || []))
+      .catch(() => setSentInvites([]))
+      .finally(() => setLoadingSentInvites(false));
+  }, []);
 
   // Load leaderboard on mount
   useEffect(() => {
@@ -200,13 +221,21 @@ export default function GamesLobbyPage() {
   // Load invites when tab changes to 'matches'
   useEffect(() => {
     if (activeTab === 'matches') {
-      setLoadingInvites(true);
-      getPendingInvites()
-        .then((r) => setInvites(r.data || []))
-        .catch(() => setInvites([]))
-        .finally(() => setLoadingInvites(false));
+      loadPendingInvites();
+      loadSentInvites();
     }
-  }, [activeTab]);
+  }, [activeTab, loadPendingInvites, loadSentInvites]);
+
+  // Fix 3 — Socket: sender navigates when their invite is accepted
+  useEffect(() => {
+    const onAccepted = ({ match_id }) => {
+      addToast({ message: 'Your friend accepted! Starting game…', type: 'success' });
+      loadSentInvites();
+      navigate(`/games/ttt/${match_id}`);
+    };
+    socket.on('invite:accepted', onAccepted);
+    return () => socket.off('invite:accepted', onAccepted);
+  }, [navigate, addToast, loadSentInvites]);
 
   // Load friends when invite modal opens
   useEffect(() => {
@@ -244,8 +273,10 @@ export default function GamesLobbyPage() {
     try {
       await sendInvite(friend.id);
       const name = `${friend.first_name || ''} ${friend.last_name || ''}`.trim() || friend.username || 'Friend';
-      addToast({ message: `${name} has been invited!`, type: 'success' });
+      addToast({ message: `Invite sent! Waiting for ${name} to accept.`, type: 'success' });
       setInviteModal(false);
+      // Fix 1 — refresh sent invites list so the new row appears immediately
+      loadSentInvites();
     } catch (err) {
       addToast({
         message: err?.response?.data?.error || 'Could not send invite.',
@@ -259,10 +290,13 @@ export default function GamesLobbyPage() {
   const handleAccept = async (inv) => {
     setActionId(inv.id);
     try {
+      // Fix 2 — backend now returns { ok, match_id }
       const r = await acceptInvite(inv.id);
-      const matchId = r.data?.id ?? r.data?.match_id;
+      const matchId = r.data?.match_id;
       if (matchId) {
         navigate(`/games/ttt/${matchId}`);
+      } else {
+        addToast({ message: 'Game started but match ID missing.', type: 'error' });
       }
     } catch (err) {
       addToast({
@@ -401,88 +435,107 @@ export default function GamesLobbyPage() {
 
         {/* ── TAB 2: ACTIVE MATCHES ──────────────────────────── */}
         {activeTab === 'matches' && (
-          <div>
-            {loadingInvites ? (
-              <div className="space-y-3">
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-4 flex items-center gap-3"
-                  >
-                    <SkeletonAvatar size="md" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-3 w-40" />
-                      <Skeleton className="h-2 w-20" />
+          <div className="space-y-8">
+
+            {/* ── Received / Pending Invites ── */}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#888888] mb-3">
+                RECEIVED INVITES
+              </p>
+              {loadingInvites ? (
+                <div className="space-y-3">
+                  {[0, 1].map((i) => (
+                    <div key={i} className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-4 flex items-center gap-3">
+                      <SkeletonAvatar size="md" />
+                      <div className="flex-1 space-y-2"><Skeleton className="h-3 w-40" /><Skeleton className="h-2 w-20" /></div>
+                      <Skeleton className="h-7 w-16" /><Skeleton className="h-7 w-16" />
                     </div>
-                    <Skeleton className="h-7 w-16 rounded-none" />
-                    <Skeleton className="h-7 w-16 rounded-none" />
-                  </div>
-                ))}
-              </div>
-            ) : invites.length > 0 ? (
-              <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-[#888888] mb-3">
-                  PENDING INVITES
-                </p>
+                  ))}
+                </div>
+              ) : invites.length > 0 ? (
                 <div className="space-y-2">
                   {invites.map((inv) => {
                     const senderName =
-                      inv.sender_name ||
+                      inv.sender_username ||
                       `${inv.first_name || ''} ${inv.last_name || ''}`.trim() ||
                       `User #${inv.sender_id}`;
                     return (
-                      <div
-                        key={inv.id}
-                        className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-4 flex items-center gap-3"
-                      >
-                        <Avatar
-                          size="md"
-                          firstName={inv.first_name || ''}
-                          lastName={inv.last_name || ''}
-                        />
+                      <div key={inv.id} className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-4 flex items-center gap-3">
+                        <Avatar size="md" firstName={inv.first_name || ''} lastName={inv.last_name || ''} />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-[#0A0A0A] font-medium">
-                            <span className="font-semibold">{senderName}</span>{' '}
-                            challenged you to TicTacToe
+                            <span className="font-semibold">{senderName}</span>{' '}challenged you to TicTacToe
                           </p>
-                          <p className="text-xs text-[#888888]">
-                            {relativeTime(inv.created_at)}
-                          </p>
+                          <p className="text-xs text-[#888888]">{relativeTime(inv.created_at)}</p>
                         </div>
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          loading={actionId === inv.id}
-                          onClick={() => handleAccept(inv)}
-                        >
-                          Accept
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-[#CC0000] hover:text-[#CC0000]"
-                          disabled={actionId === inv.id}
-                          onClick={() => handleDecline(inv)}
-                        >
-                          Decline
-                        </Button>
+                        <Button variant="primary" size="sm" loading={actionId === inv.id} onClick={() => handleAccept(inv)}>Accept</Button>
+                        <Button variant="ghost" size="sm" className="text-[#CC0000] hover:text-[#CC0000]" disabled={actionId === inv.id} onClick={() => handleDecline(inv)}>Decline</Button>
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            ) : (
-              <EmptyState
-                icon={Gamepad2}
-                title="No active matches"
-                description="Invite a friend to play!"
-                action={
-                  <Button variant="primary" onClick={() => setInviteModal(true)}>
-                    Invite a Friend
-                  </Button>
-                }
-              />
-            )}
+              ) : (
+                <p className="text-sm text-[#888888] py-4 text-center">No pending invites from friends.</p>
+              )}
+            </div>
+
+            {/* ── Sent Invites (Fix 5) ── */}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-[#888888] mb-3">
+                SENT INVITES
+              </p>
+              {loadingSentInvites ? (
+                <div className="space-y-3">
+                  {[0, 1].map((i) => (
+                    <div key={i} className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-4 flex items-center gap-3">
+                      <SkeletonAvatar size="md" />
+                      <div className="flex-1 space-y-2"><Skeleton className="h-3 w-40" /><Skeleton className="h-2 w-20" /></div>
+                      <Skeleton className="h-5 w-20 rounded-full" />
+                    </div>
+                  ))}
+                </div>
+              ) : sentInvites.length > 0 ? (
+                <div className="space-y-2">
+                  {sentInvites.map((inv) => {
+                    const receiverName =
+                      inv.receiver_username ||
+                      `${inv.first_name || ''} ${inv.last_name || ''}`.trim() ||
+                      `User #${inv.receiver_id}`;
+                    const statusConfig = {
+                      PENDING:  { icon: Clock,        cls: 'bg-[#FFF8E1] text-[#92680A] border-[#F5D87A]', label: 'Pending' },
+                      ACCEPTED: { icon: CheckCircle,  cls: 'bg-[#F0FDF4] text-[#1A7A4A] border-[#6EE7B7]', label: 'Accepted' },
+                      REJECTED: { icon: XCircle,      cls: 'bg-[#FFF5F5] text-[#CC0000] border-[#FCA5A5]', label: 'Declined' },
+                    }[inv.status] || { icon: Clock, cls: 'bg-[#F7F7F7] text-[#888888] border-[#E0E0E0]', label: inv.status };
+                    const StatusIcon = statusConfig.icon;
+                    return (
+                      <div key={inv.id} className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-4 flex items-center gap-3">
+                        <Avatar size="md" firstName={inv.first_name || ''} lastName={inv.last_name || ''} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-[#0A0A0A] font-medium">
+                            You invited <span className="font-semibold">{receiverName}</span> to TicTacToe
+                          </p>
+                          <p className="text-xs text-[#888888]">{relativeTime(inv.created_at)}</p>
+                        </div>
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full border ${statusConfig.cls}`}>
+                          <StatusIcon size={11} />{statusConfig.label}
+                        </span>
+                        {inv.status === 'ACCEPTED' && inv.match_id && (
+                          <Button variant="primary" size="sm" onClick={() => navigate(`/games/ttt/${inv.match_id}`)}>Resume →</Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={Gamepad2}
+                  title="No sent invites yet"
+                  description="Challenge a friend to TicTacToe!"
+                  action={<Button variant="primary" onClick={() => setInviteModal(true)}>Invite a Friend</Button>}
+                />
+              )}
+            </div>
+
           </div>
         )}
 

@@ -20,7 +20,26 @@ function checkWin(board, mark) {
 // GET /api/games/invites/pending
 router.get('/invites/pending', auth, async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT * FROM game_invites WHERE receiver_id = $1 AND status = 'PENDING' ORDER BY created_at DESC`,
+    `SELECT gi.*, u.username AS sender_username, u.first_name, u.last_name
+     FROM game_invites gi
+     JOIN users u ON u.id = gi.sender_id
+     WHERE gi.receiver_id = $1 AND gi.status = 'PENDING'
+     ORDER BY gi.created_at DESC`,
+    [req.user.id]
+  );
+  res.json(rows);
+});
+
+// GET /api/games/invites/sent
+router.get('/invites/sent', auth, async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT gi.*, u.username AS receiver_username,
+            u.first_name, u.last_name
+     FROM game_invites gi
+     JOIN users u ON u.id = gi.receiver_id
+     WHERE gi.sender_id = $1
+     ORDER BY gi.created_at DESC
+     LIMIT 20`,
     [req.user.id]
   );
   res.json(rows);
@@ -74,7 +93,20 @@ router.patch('/invites/:id/accept', auth, async (req, res) => {
     await client.query(`UPDATE game_invites SET match_id = $1 WHERE id = $2`, [match.id, invite.id]);
 
     await client.query('COMMIT');
-    res.json(match);
+
+    // Notify the sender so they can navigate to the match
+    const io = getIo();
+    if (io) {
+      io.to(`user:${invite.sender_id}`).emit('invite:accepted', {
+        invite_id: invite.id,
+        match_id: match.id,
+      });
+      // Also join both players to the match room
+      io.to(`user:${invite.sender_id}`).socketsJoin(`match:${match.id}`);
+      io.to(`user:${invite.receiver_id}`).socketsJoin(`match:${match.id}`);
+    }
+
+    res.json({ ok: true, match_id: match.id });
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;

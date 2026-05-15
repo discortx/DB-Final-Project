@@ -1,5 +1,6 @@
 import api from './client';
 export const getPendingInvites  = ()               => api.get('/api/games/invites/pending');
+export const getSentInvites     = ()               => api.get('/api/games/invites/sent');
 export const sendInvite         = (receiverId)     => api.post('/api/games/invites', { receiver_id: receiverId });
 export const acceptInvite       = (id)             => api.patch(`/api/games/invites/${id}/accept`);
 export const rejectInvite       = (id)             => api.patch(`/api/games/invites/${id}/reject`);
