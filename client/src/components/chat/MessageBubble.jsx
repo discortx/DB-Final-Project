@@ -24,7 +24,7 @@ export default function MessageBubble({ message, isMine, isGroup, showAvatar }) 
       ) : null}
 
       {/* Bubble + name + timestamp */}
-      <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+      <div className={`flex flex-col max-w-[70%] min-w-0 ${isMine ? 'items-end' : 'items-start'}`}>
         {/* Sender name for group chats */}
         {!isMine && isGroup && showAvatar && (
           <span className="text-[10px] font-semibold text-[#404040] mb-0.5">
@@ -34,7 +34,7 @@ export default function MessageBubble({ message, isMine, isGroup, showAvatar }) 
 
         {/* Message bubble */}
         <div
-          className={`max-w-[70%] px-3 py-2 text-sm break-words ${
+          className={`px-3 py-2 text-sm break-words w-fit ${
             isMine
               ? 'bg-[#0A0A0A] text-white rounded-lg rounded-tr-sm'
               : 'bg-[#F7F7F7] border border-[#E0E0E0] text-[#0A0A0A] rounded-lg rounded-tl-sm'
