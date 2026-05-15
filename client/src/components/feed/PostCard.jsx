@@ -9,7 +9,7 @@ import Dropdown, { DropdownItem, DropdownDivider } from '../ui/Dropdown';
 import CommentThread from './CommentThread';
 import useAuthStore from '../../store/authStore';
 import useToastStore from '../../store/toastStore';
-import { likePost, unlikePost, updatePost, deletePost } from '../../api/posts';
+import { likePost, unlikePost, updatePost, deletePost, getComments } from '../../api/posts';
 
 /* ── helpers ────────────────────────────────────────── */
 function timeAgo(dateStr) {
@@ -55,7 +55,8 @@ export default function PostCard({ post, onDelete, onUpdate }) {
 
   /* local post state for optimistic updates */
   const [localPost,      setLocalPost]      = useState(post);
-  const [commentsOpen,   setCommentsOpen]   = useState(false);
+  const [commentsOpen,      setCommentsOpen]      = useState(false);
+  const [commentsLoaded,    setCommentsLoaded]    = useState(false);
   const [editMode,       setEditMode]       = useState(false);
   const [editContent,    setEditContent]    = useState(post.content);
   const [saving,         setSaving]         = useState(false);
@@ -145,6 +146,19 @@ export default function PostCard({ post, onDelete, onUpdate }) {
     };
     setLocalPost(updated);
     onUpdate?.(updated);
+  };
+
+  /* ── toggle comments with lazy fetch ── */
+  const handleToggleComments = async () => {
+    const opening = !commentsOpen;
+    setCommentsOpen(opening);
+    if (opening && !commentsLoaded) {
+      try {
+        const res = await getComments(localPost.id);
+        setLocalPost((p) => ({ ...p, comments: res.data || [] }));
+        setCommentsLoaded(true);
+      } catch {}
+    }
   };
 
   /* ── share ── */
@@ -259,7 +273,7 @@ export default function PostCard({ post, onDelete, onUpdate }) {
           {/* Comment */}
           <button
             type="button"
-            onClick={() => setCommentsOpen((o) => !o)}
+            onClick={handleToggleComments}
             className="flex items-center gap-1.5 text-sm text-[#888888] hover:text-[#0A0A0A] transition-colors rounded-md px-2 py-1 hover:bg-[#EFEFEF]"
           >
             <MessageSquare size={16} />

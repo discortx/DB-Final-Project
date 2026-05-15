@@ -191,6 +191,20 @@ router.delete('/:id/like', auth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /api/posts/:id/comments
+router.get('/:id/comments', auth, async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT c.id, c.content, c.author_id, c.created_at,
+            u.first_name, u.last_name, u.username
+     FROM comments c
+     JOIN users u ON u.id = c.author_id
+     WHERE c.post_id = $1
+     ORDER BY c.created_at ASC`,
+    [req.params.id]
+  );
+  res.json(rows);
+});
+
 // POST /api/posts/:id/comments
 router.post(
   '/:id/comments',
@@ -200,7 +214,7 @@ router.post(
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const { rows } = await client.query(
+      const { rows: [inserted] } = await client.query(
         `INSERT INTO comments (post_id, author_id, content) VALUES ($1, $2, $3) RETURNING *`,
         [req.params.id, req.user.id, req.body.content]
       );
@@ -214,7 +228,15 @@ router.post(
         if (io) io.to(`user:${postRows[0].author_id}`).emit('notification:new', notif);
       }
       await client.query('COMMIT');
-      res.status(201).json(rows[0]);
+      // Return with author info so the frontend can render the name immediately
+      const { rows: [comment] } = await pool.query(
+        `SELECT c.id, c.content, c.author_id, c.created_at,
+                u.first_name, u.last_name, u.username
+         FROM comments c JOIN users u ON u.id = c.author_id
+         WHERE c.id = $1`,
+        [inserted.id]
+      );
+      res.status(201).json(comment);
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;

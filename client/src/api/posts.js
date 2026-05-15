@@ -5,5 +5,6 @@ export const updatePost    = (id, data)   => api.patch(`/api/posts/${id}`, data)
 export const deletePost    = (id)         => api.delete(`/api/posts/${id}`);
 export const likePost      = (id)         => api.post(`/api/posts/${id}/like`);
 export const unlikePost    = (id)         => api.delete(`/api/posts/${id}/like`);
+export const getComments   = (id)          => api.get(`/api/posts/${id}/comments`);
 export const addComment    = (id, content) => api.post(`/api/posts/${id}/comments`, { content });
 export const deleteComment = (postId, cid) => api.delete(`/api/posts/${postId}/comments/${cid}`);
