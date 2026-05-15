@@ -90,7 +90,7 @@ function TypingIndicator({ names }) {
 
 // ─── Group Info Panel ─────────────────────────────────────────────────────────
 
-function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated }) {
+function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated, onLeave }) {
   const addToast = useToastStore((s) => s.addToast);
   const [editing, setEditing] = useState(false);
   const [nameVal, setNameVal] = useState(chat?.name || '');
@@ -150,11 +150,18 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated }) {
   const handleRemoveMember = async (member) => {
     try {
       await removeMember(chat.id, member.id);
-      const r = await getChat(chat.id);
-      onChatUpdated(r.data);
-      addToast({ message: `${member.first_name} removed`, type: 'success' });
-    } catch {
-      addToast({ message: 'Failed to remove member', type: 'error' });
+      if (member.id === currentUserId) {
+        onClose();
+        if (onLeave) onLeave();
+      } else {
+        const r = await getChat(chat.id);
+        onChatUpdated(r.data);
+      }
+      addToast({ message: member.id === currentUserId ? 'You left the group' : `${member.first_name} removed`, type: 'success' });
+    } catch (err) {
+      console.error('[handleRemoveMember] error:', err);
+      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to remove member';
+      addToast({ message: String(msg), type: 'error' });
     }
   };
 
@@ -627,6 +634,7 @@ export default function ChatThreadPage() {
           open={showInfo}
           onClose={() => setShowInfo(false)}
           onChatUpdated={setChat}
+          onLeave={() => navigate('/chats')}
         />
       )}
     </div>

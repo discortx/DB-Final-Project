@@ -206,9 +206,13 @@ router.delete('/:id/members/:uid', auth, async (req, res) => {
   if (!chat) return res.status(404).json({ error: 'Chat not found' });
 
   const targetId = parseInt(req.params.uid, 10);
+  const isSelf = targetId === req.user.id;
   const isCreator = chat.creator_id === req.user.id;
-  const isSelf    = targetId === req.user.id;
-  if (!isCreator && !isSelf) return res.status(403).json({ error: 'Only the creator can remove others' });
+  const isAdminUser = await isAdmin(req.params.id, req.user.id);
+
+  if (!isSelf && !isCreator && !isAdminUser) {
+    return res.status(403).json({ error: 'Only admins or the creator can remove others' });
+  }
 
   await pool.query(`DELETE FROM chat_members WHERE chat_id = $1 AND user_id = $2`, [req.params.id, targetId]);
   res.json({ ok: true });
