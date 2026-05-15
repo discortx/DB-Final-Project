@@ -28,12 +28,15 @@ export default function RightPanel() {
   const [onlineFriends, setOnlineFriends] = useState([]);
 
   useEffect(() => {
-    (async () => {
+    const fetchOnline = async () => {
       try {
         const res = await getOnlineFriends();
         setOnlineFriends(res.data || []);
       } catch {}
-    })();
+    };
+    fetchOnline();
+    const timer = setInterval(fetchOnline, 30_000);
+    return () => clearInterval(timer);
   }, []);
 
   const handleStartDM = async (userId) => {

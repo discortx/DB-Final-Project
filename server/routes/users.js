@@ -25,7 +25,7 @@ router.get('/online', auth, async (req, res) => {
      JOIN users u ON u.id = op.user_id
      JOIN friendships f
        ON f.user_id = LEAST($1::bigint, u.id) AND f.friend_id = GREATEST($1::bigint, u.id)
-     WHERE u.id <> $1 AND u.privacy_enabled = FALSE`,
+     WHERE u.id <> $1 AND u.privacy_enabled IS NOT TRUE`,
     [req.user.id]
   );
   res.json(rows);
