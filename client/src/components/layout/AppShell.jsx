@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation, Link, NavLink } from 'react-router-dom';
 import { Home, Users, MessageCircle, Bell, User } from 'lucide-react';
 import Topbar from './Topbar';
@@ -5,6 +6,7 @@ import LeftSidebar from './LeftSidebar';
 import RightPanel from './RightPanel';
 import useAuthStore from '../../store/authStore';
 import useNotifStore from '../../store/notifStore';
+import socket from '../../socket';
 
 const BOTTOM_TABS = [
   { icon: Home,          label: 'Home',          to: '/',              exact: true  },
@@ -15,8 +17,18 @@ const BOTTOM_TABS = [
 
 export default function AppShell() {
   const user        = useAuthStore((s) => s.user);
+  const token       = useAuthStore((s) => s.token);
   const unreadCount = useNotifStore((s) => s.unreadCount);
   const location    = useLocation();
+
+  useEffect(() => {
+    if (!token) return;
+    if (!socket.connected) {
+      socket.auth = { token };
+      socket.connect();
+    }
+    return () => { socket.disconnect(); };
+  }, [token]);
 
   function isActive(to, exact) {
     if (exact) return location.pathname === to;
