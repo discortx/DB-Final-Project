@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowRight, X, Edit2, Plus } from 'lucide-react';
-import { getChat, updateChat, addMember, removeMember } from '../api/chats';
+import { ArrowRight, X, Edit2, Plus, MoreVertical } from 'lucide-react';
+import { getChat, updateChat, addMember, removeMember, updateMemberRole } from '../api/chats';
 import { getMessages, sendMessage } from '../api/messages';
 import { searchUsers } from '../api/users';
 import useAuthStore from '../store/authStore';
@@ -90,7 +90,7 @@ function TypingIndicator({ names }) {
 
 // ─── Group Info Panel ─────────────────────────────────────────────────────────
 
-function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated }) {
+function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated, onLeave }) {
   const addToast = useToastStore((s) => s.addToast);
   const [editing, setEditing] = useState(false);
   const [nameVal, setNameVal] = useState(chat?.name || '');
@@ -98,7 +98,20 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated }) {
   const [addQuery, setAddQuery] = useState('');
   const [addResults, setAddResults] = useState([]);
   const [showAddSearch, setShowAddSearch] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(null); // uid being changed
   const debouncedAdd = useDebounce(addQuery, 300);
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenDropdownId(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // Derive admin status from the member list role field
+  const isAdmin = (chat?.members || []).some(
+    (m) => String(m.id) === String(currentUserId) && m.role === 'ADMIN'
+  );
   const isCreator = chat?.creator_id === currentUserId;
 
   useEffect(() => {
@@ -136,19 +149,43 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated }) {
       setAddResults([]);
       setShowAddSearch(false);
       addToast({ message: `${user.first_name} added to group`, type: 'success' });
-    } catch {
-      addToast({ message: 'Failed to add member', type: 'error' });
+    } catch (err) {
+      console.error('[handleAddMember] error:', err);
+      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to add member';
+      addToast({ message: String(msg), type: 'error' });
     }
   };
 
   const handleRemoveMember = async (member) => {
     try {
       await removeMember(chat.id, member.id);
+      if (member.id === currentUserId) {
+        onClose();
+        if (onLeave) onLeave();
+      } else {
+        const r = await getChat(chat.id);
+        onChatUpdated(r.data);
+      }
+      addToast({ message: member.id === currentUserId ? 'You left the group' : `${member.first_name} removed`, type: 'success' });
+    } catch (err) {
+      console.error('[handleRemoveMember] error:', err);
+      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to remove member';
+      addToast({ message: String(msg), type: 'error' });
+    }
+  };
+
+  const handleChangeRole = async (member, newRole) => {
+    setRoleLoading(member.id);
+    try {
+      await updateMemberRole(chat.id, member.id, newRole);
       const r = await getChat(chat.id);
       onChatUpdated(r.data);
-      addToast({ message: `${member.first_name} removed`, type: 'success' });
+      const label = newRole === 'ADMIN' ? 'promoted to Admin' : 'demoted to Member';
+      addToast({ message: `${member.first_name} ${label}`, type: 'success' });
     } catch {
-      addToast({ message: 'Failed to remove member', type: 'error' });
+      addToast({ message: 'Failed to update role', type: 'error' });
+    } finally {
+      setRoleLoading(null);
     }
   };
 
@@ -216,7 +253,7 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated }) {
                 <span className="text-lg font-semibold text-[#0A0A0A] flex-1 truncate">
                   {chat?.name || 'Group Chat'}
                 </span>
-                {isCreator && (
+                {isAdmin && (
                   <button
                     type="button"
                     onClick={() => setEditing(true)}
@@ -246,28 +283,64 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated }) {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-[#0A0A0A] truncate font-medium">
                       {member.first_name} {member.last_name}
-                      {chat.creator_id === member.id && (
+                      {/* Show Admin badge based on role field */}
+                      {member.role === 'ADMIN' && (
                         <Badge variant="muted" className="ml-1">Admin</Badge>
                       )}
                     </p>
                     <p className="text-xs text-[#888888] truncate">@{member.username}</p>
                   </div>
-                  {isCreator && member.id !== currentUserId && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMember(member)}
-                      className="p-1 rounded-md hover:bg-[#EFEFEF] transition-colors text-[#CC0000] shrink-0"
-                      aria-label={`Remove ${member.first_name}`}
-                    >
-                      <X size={14} />
-                    </button>
+                  {/* Admin actions for other members */}
+                  {isAdmin && String(member.id) !== String(currentUserId) && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenDropdownId(openDropdownId === member.id ? null : member.id);
+                        }}
+                        className="p-1 rounded-md hover:bg-[#EFEFEF] transition-colors text-[#888888] shrink-0"
+                        aria-label="Member options"
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      
+                      {openDropdownId === member.id && (
+                        <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-border shadow-sm rounded-md z-50 py-1">
+                          <button
+                            type="button"
+                            disabled={roleLoading === member.id}
+                            onClick={() => {
+                              handleChangeRole(
+                                member,
+                                member.role === 'ADMIN' ? 'MEMBER' : 'ADMIN'
+                              );
+                              setOpenDropdownId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-surface-2 transition-colors"
+                          >
+                            {roleLoading === member.id ? 'Updating...' : member.role === 'ADMIN' ? 'Demote to Member' : 'Promote to Admin'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleRemoveMember(member);
+                              setOpenDropdownId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-surface-2 transition-colors text-danger"
+                          >
+                            Remove from Group
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
             </div>
 
-            {/* Add member */}
-            {isCreator && (
+            {/* Add member — visible to all admins */}
+            {isAdmin && (
               <div className="mt-2">
                 {showAddSearch ? (
                   <div className="relative">
@@ -585,6 +658,7 @@ export default function ChatThreadPage() {
           open={showInfo}
           onClose={() => setShowInfo(false)}
           onChatUpdated={setChat}
+          onLeave={() => navigate('/chats')}
         />
       )}
     </div>

@@ -3,12 +3,21 @@ const { z }    = require('zod');
 const pool     = require('../db/pool');
 const auth     = require('../middleware/auth');
 const validate = require('../middleware/validate');
+const { getIo } = require('../sockets');
 
 const router = express.Router();
 
 async function isMember(chatId, userId) {
   const { rows } = await pool.query(
     `SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2`,
+    [chatId, userId]
+  );
+  return rows.length > 0;
+}
+
+async function isAdmin(chatId, userId) {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2 AND role = 'ADMIN'`,
     [chatId, userId]
   );
   return rows.length > 0;
@@ -72,28 +81,62 @@ router.post(
   validate(z.object({
     name:        z.string().min(1).max(255),
     description: z.string().max(1000).optional(),
-    member_ids:  z.array(z.number().int().positive()).min(1),
+    member_ids:  z.array(z.coerce.number().int().positive()).min(1),
   })),
   async (req, res) => {
     const { name, description, member_ids } = req.body;
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+
+      // 1. Create the chat
       const { rows: [chat] } = await client.query(
         `INSERT INTO chats (type, name, description, creator_id) VALUES ('GROUP', $1, $2, $3) RETURNING *`,
         [name, description || null, req.user.id]
       );
-      const allMembers  = [...new Set([req.user.id, ...member_ids])];
-      const placeholders = allMembers.map((_, i) => `($1, $${i + 2})`).join(',');
+
+      // 2. Insert creator as ADMIN
       await client.query(
-        `INSERT INTO chat_members (chat_id, user_id) VALUES ${placeholders}`,
-        [chat.id, ...allMembers]
+        `INSERT INTO chat_members (chat_id, user_id, role) VALUES ($1, $2, 'ADMIN')`,
+        [chat.id, req.user.id]
       );
+
+      // 3. Insert invited members as MEMBER (deduplicated, skip creator if present)
+      const uniqueMembers = [...new Set(member_ids.map(Number))].filter(
+        (uid) => uid !== Number(req.user.id)
+      );
+      if (uniqueMembers.length > 0) {
+        const placeholders = uniqueMembers
+          .map((_, i) => `($1, $${i + 2}, 'MEMBER')`)
+          .join(',');
+        await client.query(
+          `INSERT INTO chat_members (chat_id, user_id, role) VALUES ${placeholders}`,
+          [chat.id, ...uniqueMembers]
+        );
+      }
+
       await client.query('COMMIT');
+
+      // 4. Send notifications to invited members (outside transaction)
+      const io = getIo();
+      for (const uid of uniqueMembers) {
+        try {
+          const { rows: [notif] } = await pool.query(
+            `INSERT INTO notifications (recipient_id, sender_id, type, text)
+             VALUES ($1, $2, 'GAME', $3) RETURNING *`,
+            [uid, req.user.id, `${req.user.username} added you to the group "${name}"`]
+          );
+          if (io) io.to(`user:${uid}`).emit('notification:new', notif);
+        } catch (ne) {
+          console.warn('[POST /chats/group] notification failed for uid', uid, ne.message);
+        }
+      }
+
       res.status(201).json(chat);
     } catch (e) {
       await client.query('ROLLBACK');
-      throw e;
+      console.error('[POST /chats/group] error:', e);
+      res.status(500).json({ error: e?.message || 'Failed to create group chat' });
     } finally {
       client.release();
     }
@@ -109,7 +152,7 @@ router.get('/:id', auth, async (req, res) => {
   if (!chat) return res.status(404).json({ error: 'Chat not found' });
 
   const { rows: members } = await pool.query(
-    `SELECT u.id, u.username, u.first_name, u.last_name, cm.joined_at
+    `SELECT u.id, u.username, u.first_name, u.last_name, cm.joined_at, cm.role
      FROM chat_members cm JOIN users u ON u.id = cm.user_id
      WHERE cm.chat_id = $1`,
     [req.params.id]
@@ -144,13 +187,19 @@ router.patch(
 router.post(
   '/:id/members',
   auth,
-  validate(z.object({ user_id: z.number().int().positive() })),
+  validate(z.object({ user_id: z.coerce.number().int().positive() })),
   async (req, res) => {
-    if (!(await isMember(req.params.id, req.user.id))) {
-      return res.status(403).json({ error: 'Not a member' });
+    if (!(await isAdmin(req.params.id, req.user.id))) {
+      return res.status(403).json({ error: 'Only admins can add members' });
     }
+
+    // Check for duplicate
+    if (await isMember(req.params.id, req.body.user_id)) {
+      return res.status(400).json({ error: 'User is already a member' });
+    }
+
     await pool.query(
-      `INSERT INTO chat_members (chat_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      `INSERT INTO chat_members (chat_id, user_id, role) VALUES ($1, $2, 'MEMBER') ON CONFLICT DO NOTHING`,
       [req.params.id, req.body.user_id]
     );
     res.json({ ok: true });
@@ -163,12 +212,40 @@ router.delete('/:id/members/:uid', auth, async (req, res) => {
   if (!chat) return res.status(404).json({ error: 'Chat not found' });
 
   const targetId = parseInt(req.params.uid, 10);
+  const isSelf = targetId === req.user.id;
   const isCreator = chat.creator_id === req.user.id;
-  const isSelf    = targetId === req.user.id;
-  if (!isCreator && !isSelf) return res.status(403).json({ error: 'Only the creator can remove others' });
+  const isAdminUser = await isAdmin(req.params.id, req.user.id);
+
+  if (!isSelf && !isCreator && !isAdminUser) {
+    return res.status(403).json({ error: 'Only admins or the creator can remove others' });
+  }
 
   await pool.query(`DELETE FROM chat_members WHERE chat_id = $1 AND user_id = $2`, [req.params.id, targetId]);
   res.json({ ok: true });
 });
+
+// PATCH /api/chats/:id/members/:uid/role
+router.patch(
+  '/:id/members/:uid/role',
+  auth,
+  validate(z.object({ role: z.enum(['ADMIN', 'MEMBER']) })),
+  async (req, res) => {
+    if (!(await isAdmin(req.params.id, req.user.id))) {
+      return res.status(403).json({ error: 'Only admins can change roles' });
+    }
+    const targetId = parseInt(req.params.uid, 10);
+    if (targetId === req.user.id) {
+      return res.status(400).json({ error: 'Cannot change your own role' });
+    }
+    const { rows } = await pool.query(
+      `UPDATE chat_members SET role = $3
+       WHERE chat_id = $1 AND user_id = $2
+       RETURNING *`,
+      [req.params.id, targetId, req.body.role]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Member not found' });
+    res.json(rows[0]);
+  }
+);
 
 module.exports = router;

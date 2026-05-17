@@ -20,7 +20,26 @@ function checkWin(board, mark) {
 // GET /api/games/invites/pending
 router.get('/invites/pending', auth, async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT * FROM game_invites WHERE receiver_id = $1 AND status = 'PENDING' ORDER BY created_at DESC`,
+    `SELECT gi.*, u.username AS sender_username, u.first_name, u.last_name
+     FROM game_invites gi
+     JOIN users u ON u.id = gi.sender_id
+     WHERE gi.receiver_id = $1 AND gi.status = 'PENDING'
+     ORDER BY gi.created_at DESC`,
+    [req.user.id]
+  );
+  res.json(rows);
+});
+
+// GET /api/games/invites/sent
+router.get('/invites/sent', auth, async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT gi.*, u.username AS receiver_username,
+            u.first_name, u.last_name
+     FROM game_invites gi
+     JOIN users u ON u.id = gi.receiver_id
+     WHERE gi.sender_id = $1
+     ORDER BY gi.created_at DESC
+     LIMIT 20`,
     [req.user.id]
   );
   res.json(rows);
@@ -30,9 +49,9 @@ router.get('/invites/pending', auth, async (req, res) => {
 router.post(
   '/invites',
   auth,
-  validate(z.object({ receiver_id: z.number().int().positive() })),
+  validate(z.object({ receiver_id: z.coerce.number().int().positive() })),
   async (req, res) => {
-    if (req.body.receiver_id === req.user.id) {
+    if (String(req.body.receiver_id) === String(req.user.id)) {
       return res.status(400).json({ error: 'Cannot invite yourself' });
     }
     const { rows } = await pool.query(
@@ -74,7 +93,20 @@ router.patch('/invites/:id/accept', auth, async (req, res) => {
     await client.query(`UPDATE game_invites SET match_id = $1 WHERE id = $2`, [match.id, invite.id]);
 
     await client.query('COMMIT');
-    res.json(match);
+
+    // Notify the sender so they can navigate to the match
+    const io = getIo();
+    if (io) {
+      io.to(`user:${invite.sender_id}`).emit('invite:accepted', {
+        invite_id: invite.id,
+        match_id: match.id,
+      });
+      // Also join both players to the match room
+      io.to(`user:${invite.sender_id}`).socketsJoin(`match:${match.id}`);
+      io.to(`user:${invite.receiver_id}`).socketsJoin(`match:${match.id}`);
+    }
+
+    res.json({ ok: true, match_id: match.id });
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;
@@ -102,7 +134,7 @@ router.get('/matches/:id', auth, async (req, res) => {
     [req.params.id]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Match not found' });
-  if (rows[0].player1_id !== req.user.id && rows[0].player2_id !== req.user.id) {
+  if (String(rows[0].player1_id) !== String(req.user.id) && String(rows[0].player2_id) !== String(req.user.id)) {
     return res.status(403).json({ error: 'Not a participant' });
   }
   res.json(rows[0]);
@@ -126,7 +158,7 @@ router.post(
         await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Match not found' });
       }
-      if (match.player1_id !== req.user.id && match.player2_id !== req.user.id) {
+      if (String(match.player1_id) !== String(req.user.id) && String(match.player2_id) !== String(req.user.id)) {
         await client.query('ROLLBACK');
         return res.status(403).json({ error: 'Not a participant' });
       }
@@ -134,7 +166,7 @@ router.post(
         await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Game already ended' });
       }
-      if (match.current_turn_id !== req.user.id) {
+      if (String(match.current_turn_id) !== String(req.user.id)) {
         await client.query('ROLLBACK');
         return res.status(400).json({ error: 'Not your turn' });
       }
@@ -146,7 +178,7 @@ router.post(
         return res.status(400).json({ error: 'Cell already taken' });
       }
 
-      const myMark  = match.player1_id === req.user.id ? match.player1_mark : match.player2_mark;
+      const myMark  = String(match.player1_id) === String(req.user.id) ? match.player1_mark : match.player2_mark;
       board[position] = myMark;
       const newBoard  = board.join('');
 
@@ -159,24 +191,26 @@ router.post(
       if (checkWin(newBoard, myMark)) {
         state    = 'WIN';
         winnerId = req.user.id;
-        if (req.user.id === match.player1_id) p1Score++; else p2Score++;
+        if (String(req.user.id) === String(match.player1_id)) p1Score++; else p2Score++;
         total++;
       } else if (!newBoard.includes('-')) {
         state = 'DRAW';
         total++;
       }
 
-      const otherId = match.player1_id === req.user.id ? match.player2_id : match.player1_id;
+      const otherId = String(match.player1_id) === String(req.user.id) ? match.player2_id : match.player1_id;
 
       const { rows: [updated] } = await client.query(
         `UPDATE tictactoe_matches SET
            board           = $2,
-           state           = $3,
-           winner_id       = $4,
+           state           = $3::game_state,
+           winner_id       = $4::bigint,
            player1_score   = $5,
            player2_score   = $6,
            total_games     = $7,
-           current_turn_id = CASE WHEN $3 = 'CONTINUE' THEN $8 ELSE current_turn_id END
+           current_turn_id = CASE WHEN $3::text = 'CONTINUE'
+                                  THEN $8::bigint
+                                  ELSE current_turn_id END
          WHERE id = $1 RETURNING *`,
         [match.id, newBoard, state, winnerId, p1Score, p2Score, total, otherId]
       );
@@ -196,27 +230,99 @@ router.post(
   }
 );
 
-// POST /api/games/matches/:id/rematch
-router.post('/matches/:id/rematch', auth, async (req, res) => {
-  const { rows: [match] } = await pool.query(`SELECT * FROM tictactoe_matches WHERE id = $1`, [req.params.id]);
+// POST /api/games/matches/:id/rematch-propose
+router.post('/matches/:id/rematch-propose', auth, async (req, res) => {
+  const { rows: [match] } = await pool.query(
+    `SELECT * FROM tictactoe_matches WHERE id = $1`, [req.params.id]
+  );
   if (!match) return res.status(404).json({ error: 'Match not found' });
-  if (match.player1_id !== req.user.id && match.player2_id !== req.user.id) {
-    return res.status(403).json({ error: 'Not a participant' });
+  if (
+    String(match.player1_id) !== String(req.user.id) &&
+    String(match.player2_id) !== String(req.user.id)
+  ) return res.status(403).json({ error: 'Not a participant' });
+  if (match.state === 'CONTINUE') {
+    return res.status(400).json({ error: 'Game still in progress' });
   }
-  if (match.state === 'CONTINUE') return res.status(400).json({ error: 'Game still in progress' });
 
-  const nextTurn = match.current_turn_id === match.player1_id ? match.player2_id : match.player1_id;
+  const { rows: [updated] } = await pool.query(
+    `UPDATE tictactoe_matches SET rematch_proposed_by = $2
+     WHERE id = $1 RETURNING *`,
+    [req.params.id, req.user.id]
+  );
+
+  // Notify the OTHER player via socket
+  const otherId =
+    String(match.player1_id) === String(req.user.id)
+      ? match.player2_id
+      : match.player1_id;
+
+  const io = getIo();
+  if (io) {
+    io.to(`user:${otherId}`).emit('rematch:proposed', {
+      match_id: match.id,
+      proposed_by: req.user.id,
+    });
+  }
+
+  res.json(updated);
+});
+
+// POST /api/games/matches/:id/rematch-accept
+router.post('/matches/:id/rematch-accept', auth, async (req, res) => {
+  const { rows: [match] } = await pool.query(
+    `SELECT * FROM tictactoe_matches WHERE id = $1`, [req.params.id]
+  );
+  if (!match) return res.status(404).json({ error: 'Match not found' });
+  if (
+    String(match.player1_id) !== String(req.user.id) &&
+    String(match.player2_id) !== String(req.user.id)
+  ) return res.status(403).json({ error: 'Not a participant' });
+  if (!match.rematch_proposed_by) {
+    return res.status(400).json({ error: 'No rematch proposed' });
+  }
+  if (String(match.rematch_proposed_by) === String(req.user.id)) {
+    return res.status(400).json({ error: 'Cannot accept your own proposal' });
+  }
+
+  const nextTurn =
+    String(match.current_turn_id) === String(match.player1_id)
+      ? match.player2_id
+      : match.player1_id;
+
   const { rows: [updated] } = await pool.query(
     `UPDATE tictactoe_matches
-     SET board = '---------', state = 'CONTINUE', winner_id = NULL, current_turn_id = $2
+     SET board = '---------', state = 'CONTINUE'::game_state, winner_id = NULL,
+         current_turn_id = $2::bigint, rematch_proposed_by = NULL
      WHERE id = $1 RETURNING *`,
-    [match.id, nextTurn]
+    [req.params.id, nextTurn]
   );
 
   const io = getIo();
   if (io) io.to(`match:${match.id}`).emit('game:move', updated);
 
   res.json(updated);
+});
+
+// POST /api/games/matches/:id/rematch-decline
+router.post('/matches/:id/rematch-decline', auth, async (req, res) => {
+  const { rows: [match] } = await pool.query(
+    `SELECT * FROM tictactoe_matches WHERE id = $1`, [req.params.id]
+  );
+  if (!match) return res.status(404).json({ error: 'Match not found' });
+
+  await pool.query(
+    `UPDATE tictactoe_matches SET rematch_proposed_by = NULL WHERE id = $1`,
+    [req.params.id]
+  );
+
+  const io = getIo();
+  if (io) {
+    io.to(`match:${match.id}`).emit('rematch:declined', {
+      match_id: match.id,
+    });
+  }
+
+  res.json({ ok: true });
 });
 
 // POST /api/games/snake/score

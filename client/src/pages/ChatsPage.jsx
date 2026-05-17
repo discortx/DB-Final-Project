@@ -146,11 +146,17 @@ function NewGroupModal({ open, onClose, onCreated }) {
       const r = await createGroup({
         name: groupName.trim(),
         description: description.trim() || undefined,
-        member_ids: selectedMembers.map((u) => u.id),
+        member_ids: selectedMembers.map((u) => Number(u.id)),
       });
       onCreated(r.data.id);
-    } catch {
-      setError('Failed to create group. Please try again.');
+    } catch (err) {
+      console.error('[NewGroupModal] createGroup error:', err);
+      const msg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to create group. Please try again.';
+      setError(String(msg));
     } finally {
       setCreating(false);
     }
