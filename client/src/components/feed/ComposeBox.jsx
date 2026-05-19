@@ -1,33 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
 import { Users, Globe, Tag, Loader2, X, ChevronDown } from 'lucide-react';
 import Avatar from '../ui/Avatar';
-import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import useAuthStore from '../../store/authStore';
 import useToastStore from '../../store/toastStore';
 import { createPost } from '../../api/posts';
 import { searchUsers } from '../../api/users';
 
+const COMPOSE_CSS = `
+  .compose-textarea::placeholder { color: rgba(245,240,239,0.28); }
+  .compose-textarea:focus { border-color: rgba(139,21,32,0.4) !important; outline: none; }
+  .compose-tag-btn:hover { background: rgba(255,255,255,0.08) !important; }
+`;
+
 /* ── visibility config ─────────────────────────────── */
 const VISIBILITY_OPTIONS = [
-  {
-    value: 'FRIENDS',
-    label: 'Friends only',
-    icon: Users,
-    desc: 'Only your friends can see this post.',
-  },
-  {
-    value: 'FRIENDS_OF_FRIENDS',
-    label: 'Friends of friends',
-    icon: Users,
-    desc: 'Your friends and their friends can see this.',
-  },
-  {
-    value: 'PUBLIC',
-    label: 'Public',
-    icon: Globe,
-    desc: 'Anyone on Sora Link can see this post.',
-  },
+  { value: 'FRIENDS',          label: 'Friends only',       icon: Users, desc: 'Only your friends can see this post.'          },
+  { value: 'FRIENDS_OF_FRIENDS', label: 'Friends of friends', icon: Users, desc: 'Your friends and their friends can see this.' },
+  { value: 'PUBLIC',           label: 'Public',             icon: Globe, desc: 'Anyone on Sora Link can see this post.'         },
 ];
 
 function VisibilityDropdown({ value, onChange }) {
@@ -49,14 +39,32 @@ function VisibilityDropdown({ value, onChange }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-xs text-[#404040] border border-[#E0E0E0] rounded-md px-2 py-1.5 hover:bg-[#EFEFEF] transition-colors"
+        className="compose-tag-btn flex items-center gap-1.5 transition-colors"
+        style={{
+          fontSize: '0.75rem',
+          color: 'rgba(245,240,239,0.5)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '6px',
+          padding: '4px 10px',
+          background: 'transparent',
+          cursor: 'pointer',
+        }}
       >
-        <Icon size={14} />
+        <Icon size={13} />
         <span>{current.label}</span>
-        <ChevronDown size={12} className="text-[#888888]" />
+        <ChevronDown size={11} style={{ color: 'rgba(245,240,239,0.3)' }} />
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-[#E0E0E0] rounded-lg shadow-md py-1 min-w-[200px]">
+        <div
+          className="absolute left-0 top-full mt-1 z-50 py-1"
+          style={{
+            background: '#1E181A',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '8px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            minWidth: '210px',
+          }}
+        >
           {VISIBILITY_OPTIONS.map((opt) => {
             const OIcon = opt.icon;
             return (
@@ -64,13 +72,17 @@ function VisibilityDropdown({ value, onChange }) {
                 key={opt.value}
                 type="button"
                 onClick={() => { onChange(opt.value); setOpen(false); }}
-                className={`w-full text-left px-3 py-2 hover:bg-[#F7F7F7] transition-colors flex items-start gap-2
-                  ${opt.value === value ? 'bg-[#F7F7F7]' : ''}`}
+                className="w-full text-left flex items-start gap-2 px-3 py-2 transition-colors hover:bg-white/5"
+                style={{
+                  background: opt.value === value ? 'rgba(255,255,255,0.04)' : 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
               >
-                <OIcon size={14} className="mt-0.5 shrink-0 text-[#404040]" />
+                <OIcon size={13} style={{ marginTop: '2px', flexShrink: 0, color: 'rgba(245,240,239,0.45)' }} />
                 <div>
-                  <p className="text-sm font-medium text-[#0A0A0A]">{opt.label}</p>
-                  <p className="text-xs text-[#888888]">{opt.desc}</p>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 500, color: '#F5F0EF' }}>{opt.label}</p>
+                  <p style={{ fontSize: '0.72rem', color: 'rgba(245,240,239,0.38)' }}>{opt.desc}</p>
                 </div>
               </button>
             );
@@ -123,7 +135,7 @@ function TagModal({ open, onClose, taggedUsers, onToggle }) {
                 onClick={() => onToggle(u)}
                 className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#F7F7F7] transition-colors text-left"
               >
-                <Avatar firstName={u.first_name} lastName={u.last_name} size="sm" />
+                <Avatar firstName={u.first_name} lastName={u.last_name} userId={u.id} size="sm" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[#0A0A0A] truncate">
                     {u.first_name} {u.last_name}
@@ -173,7 +185,6 @@ export default function ComposeBox({ onPost }) {
   const [submitting,  setSubmitting]  = useState(false);
   const textareaRef = useRef(null);
 
-  /* Focus textarea when expanding */
   useEffect(() => {
     if (expanded && textareaRef.current) {
       textareaRef.current.focus();
@@ -220,52 +231,96 @@ export default function ComposeBox({ onPost }) {
     setSubmitting(false);
   };
 
+  const canPost = content.trim().length > 0 && !submitting;
+
   return (
     <>
-      <div className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-4 mb-6">
+      <style>{COMPOSE_CSS}</style>
+      <div
+        style={{
+          background: '#171214',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: '10px',
+          padding: '16px',
+          marginBottom: '16px',
+        }}
+      >
         {/* Collapsed prompt */}
         {!expanded ? (
           <div className="flex items-center gap-3">
-            <Avatar firstName={user?.first_name} lastName={user?.last_name} size="sm" />
+            <Avatar firstName={user?.first_name} lastName={user?.last_name} userId={user?.id} size="sm" />
             <div
               role="button"
               tabIndex={0}
               onClick={() => setExpanded(true)}
               onKeyDown={(e) => e.key === 'Enter' && setExpanded(true)}
-              className="flex-1 bg-white border border-[#E0E0E0] rounded-full px-4 py-2 text-sm text-[#888888] cursor-text select-none hover:border-[#C0C0C0] transition-colors"
+              style={{
+                flex: 1,
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '24px',
+                padding: '8px 16px',
+                fontSize: '0.875rem',
+                color: 'rgba(245,240,239,0.28)',
+                cursor: 'text',
+                userSelect: 'none',
+                transition: 'border-color 0.15s',
+              }}
             >
               What's on your mind, {user?.first_name}?
             </div>
           </div>
         ) : (
-          /* Expanded compose */
+          /* Expanded */
           <div>
             <div className="flex items-start gap-3">
-              <Avatar firstName={user?.first_name} lastName={user?.last_name} size="sm" />
+              <Avatar firstName={user?.first_name} lastName={user?.last_name} userId={user?.id} size="sm" />
               <textarea
                 ref={textareaRef}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder={`What's on your mind, ${user?.first_name}?`}
                 rows={3}
-                className="flex-1 bg-white border border-[#E0E0E0] rounded-md p-3 text-sm w-full min-h-[80px] resize-none
-                           focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors"
+                className="compose-textarea"
+                style={{
+                  flex: 1,
+                  width: '100%',
+                  minHeight: '80px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  color: '#F5F0EF',
+                  fontSize: '0.875rem',
+                  padding: '10px 12px',
+                  resize: 'none',
+                  fontFamily: 'inherit',
+                  transition: 'border-color 0.2s',
+                }}
               />
             </div>
 
-            {/* Tagged users pills */}
+            {/* Tagged user pills */}
             {taggedUsers.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2 pl-11">
                 {taggedUsers.map((u) => (
                   <span
                     key={u.id}
-                    className="inline-flex items-center gap-1 bg-[#0A0A0A] text-white text-xs px-2 py-0.5 rounded-full"
+                    style={{
+                      background: '#8B1520',
+                      color: '#F5F0EF',
+                      fontSize: '0.7rem',
+                      padding: '2px 8px',
+                      borderRadius: '20px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
                   >
                     {u.first_name} {u.last_name}
                     <button
                       type="button"
                       onClick={() => toggleTag(u)}
-                      className="hover:opacity-70"
+                      style={{ opacity: 0.7, background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}
                     >
                       <X size={10} />
                     </button>
@@ -281,34 +336,65 @@ export default function ComposeBox({ onPost }) {
                 <button
                   type="button"
                   onClick={() => setTagModal(true)}
-                  className="flex items-center gap-1.5 text-xs text-[#404040] border border-[#E0E0E0] rounded-md px-2 py-1.5 hover:bg-[#EFEFEF] transition-colors"
+                  className="compose-tag-btn flex items-center gap-1.5 transition-colors"
+                  style={{
+                    fontSize: '0.75rem',
+                    color: 'rgba(245,240,239,0.5)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                  }}
                 >
-                  <Tag size={14} />
+                  <Tag size={13} />
                   <span>Tag</span>
                   {taggedUsers.length > 0 && (
-                    <span className="ml-0.5 font-semibold text-[#0A0A0A]">
+                    <span style={{ fontWeight: 600, color: '#F5F0EF' }}>
                       ({taggedUsers.length})
                     </span>
                   )}
                 </button>
               </div>
+
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
+                  type="button"
                   onClick={() => { setExpanded(false); setContent(''); setTaggedUsers([]); }}
+                  style={{
+                    fontSize: '0.8rem',
+                    color: 'rgba(245,240,239,0.38)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                    transition: 'color 0.15s',
+                  }}
                 >
                   Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  disabled={!content.trim() || submitting}
-                  loading={submitting}
+                </button>
+                <button
+                  type="button"
+                  disabled={!canPost}
                   onClick={handleSubmit}
+                  style={{
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    background: canPost ? '#8B1520' : 'rgba(139,21,32,0.35)',
+                    color: canPost ? '#F5F0EF' : 'rgba(245,240,239,0.4)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '5px 18px',
+                    cursor: canPost ? 'pointer' : 'not-allowed',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    transition: 'background 0.15s',
+                  }}
                 >
+                  {submitting && <Loader2 size={13} className="animate-spin" />}
                   Post
-                </Button>
+                </button>
               </div>
             </div>
           </div>

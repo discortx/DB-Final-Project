@@ -4,17 +4,22 @@ import {
   Home, User, Users, MessageCircle,
   Gamepad2,
 } from 'lucide-react';
-import Badge from '../ui/Badge';
+import Avatar from '../ui/Avatar';
 import useAuthStore from '../../store/authStore';
 import { getInbox } from '../../api/friends';
 import socket from '../../socket';
 
+const SIDEBAR_CSS = `
+  .sl-nav-link { transition: all 0.15s ease; text-decoration: none; }
+  .sl-nav-link:hover { background: rgba(255,255,255,0.05) !important; }
+  .sl-nav-link.active:hover { background: rgba(139,21,32,0.22) !important; }
+`;
+
 export default function LeftSidebar() {
-  const user       = useAuthStore((s) => s.user);
+  const user = useAuthStore((s) => s.user);
 
   const [pendingCount, setPendingCount] = useState(0);
 
-  /* load pending friend request count */
   useEffect(() => {
     (async () => {
       try {
@@ -24,7 +29,6 @@ export default function LeftSidebar() {
     })();
   }, []);
 
-  /* socket: increment pending badge when new friend request arrives */
   useEffect(() => {
     function handle(notif) {
       if (notif?.type === 'FRIEND_REQUEST') {
@@ -36,43 +40,102 @@ export default function LeftSidebar() {
   }, []);
 
   const navItems = [
-    { icon: Home,          label: 'Home',          to: '/',                  end: true,  badge: null        },
-    { icon: User,          label: 'Profile',        to: `/profile/${user?.id}`, end: false, badge: null     },
-    { icon: Users,         label: 'Friends',        to: '/friends',           end: false, badge: pendingCount },
-    { icon: MessageCircle, label: 'Messages',       to: '/chats',             end: false, badge: null        },
-    { icon: Gamepad2,      label: 'Games',          to: '/games',             end: false, badge: null        },
+    { icon: Home,          label: 'Home',     to: '/',                  end: true,  badge: null         },
+    { icon: User,          label: 'Profile',  to: `/profile/${user?.id}`, end: false, badge: null       },
+    { icon: Users,         label: 'Friends',  to: '/friends',           end: false, badge: pendingCount },
+    { icon: MessageCircle, label: 'Messages', to: '/chats',             end: false, badge: null         },
+    { icon: Gamepad2,      label: 'Games',    to: '/games',             end: false, badge: null         },
   ];
 
   return (
-    <aside className="bg-[#F7F7F7] border-r border-[#E0E0E0] pt-4 px-3 pb-6 flex flex-col w-full h-full">
-      {/* Section label */}
-      <p className="text-[10px] font-bold tracking-widest text-[#888888] px-3 mb-1 uppercase">
-        Menu
-      </p>
+    <>
+      <style>{SIDEBAR_CSS}</style>
+      <aside
+        style={{ background: '#100D0E' }}
+        className="pt-4 px-2 pb-4 flex flex-col w-full h-full"
+      >
+        <p
+          style={{ color: 'rgba(245,240,239,0.28)', fontSize: '0.6rem', letterSpacing: '0.14em', fontWeight: 700 }}
+          className="px-3 mb-2 uppercase"
+        >
+          Menu
+        </p>
 
-      {/* Nav items */}
-      <nav className="flex flex-col gap-0.5">
-        {navItems.map(({ icon: Icon, label, to, end, badge }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              `relative flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors
-               ${isActive
-                 ? 'bg-[#EFEFEF] text-[#0A0A0A] font-semibold before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[3px] before:h-[60%] before:bg-black before:rounded-r'
-                 : 'text-[#404040] hover:bg-[#EFEFEF] hover:text-[#0A0A0A]'
-               }`
-            }
+        <nav className="flex flex-col gap-0.5 flex-1">
+          {navItems.map(({ icon: Icon, label, to, end, badge }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className="sl-nav-link flex items-center gap-3 text-sm"
+              style={({ isActive }) => ({
+                padding: '8px 12px',
+                paddingLeft: '9px',
+                color: isActive ? '#F5F0EF' : 'rgba(245,240,239,0.5)',
+                background: isActive ? 'rgba(139,21,32,0.15)' : 'transparent',
+                borderLeft: `3px solid ${isActive ? '#C41E33' : 'transparent'}`,
+                borderRadius: isActive ? '0 6px 6px 0' : '6px',
+                fontWeight: isActive ? 600 : 400,
+              })}
+            >
+              <Icon size={17} className="shrink-0" />
+              <span className="flex-1 truncate">{label}</span>
+              {badge != null && badge > 0 && (
+                <span
+                  style={{
+                    background: '#8B1520',
+                    color: '#F5F0EF',
+                    fontSize: '10px',
+                    padding: '1px 6px',
+                    borderRadius: '10px',
+                    fontWeight: 600,
+                    lineHeight: '16px',
+                  }}
+                >
+                  {badge}
+                </span>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* User info pinned at bottom */}
+        {user && (
+          <div
+            className="pt-3 mt-3 px-2"
+            style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
           >
-            <Icon size={18} className="shrink-0" />
-            <span className="flex-1 truncate">{label}</span>
-            {badge != null && badge > 0 && (
-              <Badge variant="default">{badge}</Badge>
-            )}
-          </NavLink>
-        ))}
-      </nav>
-    </aside>
+            <div className="flex items-center gap-2">
+              <div className="relative shrink-0">
+                <Avatar
+                  firstName={user.first_name}
+                  lastName={user.last_name}
+                  userId={user.id}
+                  size="sm"
+                />
+                <span
+                  className="absolute bottom-0 right-0 w-2 h-2 rounded-full"
+                  style={{ background: '#1A7A4A', border: '2px solid #100D0E' }}
+                />
+              </div>
+              <div className="min-w-0">
+                <p
+                  style={{ color: '#F5F0EF', fontSize: '0.78rem', fontWeight: 500 }}
+                  className="truncate"
+                >
+                  {user.first_name} {user.last_name}
+                </p>
+                <p
+                  style={{ color: 'rgba(245,240,239,0.38)', fontSize: '0.7rem' }}
+                  className="truncate"
+                >
+                  @{user.username}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </aside>
+    </>
   );
 }

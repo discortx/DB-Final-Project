@@ -1,10 +1,10 @@
-const BG_COLORS = [
-  { bg: 'bg-[#E8F0FE]', text: 'text-[#1967D2]' },
-  { bg: 'bg-[#FCE8E6]', text: 'text-[#C5221F]' },
-  { bg: 'bg-[#E6F4EA]', text: 'text-[#1E7E34]' },
-  { bg: 'bg-[#FEF7E0]', text: 'text-[#B06000]' },
-  { bg: 'bg-[#F3E8FD]', text: 'text-[#7B1FA2]' },
-  { bg: 'bg-[#E8F5E9]', text: 'text-[#2E7D32]' },
+const DARK_COLORS = [
+  { bg: '#2C4A7A', text: '#A8C4F0' },
+  { bg: '#8B1520', text: '#F0A8AD' },
+  { bg: '#2A6040', text: '#A8F0C4' },
+  { bg: '#7A5A2C', text: '#F0DCA8' },
+  { bg: '#5A2C7A', text: '#D4A8F0' },
+  { bg: '#7A3A2C', text: '#F0BEA8' },
 ];
 
 function hashName(name) {
@@ -13,7 +13,7 @@ function hashName(name) {
   for (let i = 0; i < name.length; i++) {
     hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
   }
-  return hash % BG_COLORS.length;
+  return hash % DARK_COLORS.length;
 }
 
 const SIZE_CLASSES = {
@@ -27,14 +27,17 @@ const SIZE_CLASSES = {
 export default function Avatar({
   firstName = '',
   lastName = '',
+  userId,
   size = 'md',
   online = false,
   src,
   className = '',
 }) {
   const fullName = `${firstName}${lastName}`.trim();
-  const colorIndex = hashName(fullName);
-  const { bg, text } = BG_COLORS[colorIndex];
+  const colorIndex = typeof userId === 'number'
+    ? userId % DARK_COLORS.length
+    : hashName(fullName);
+  const { bg, text } = DARK_COLORS[colorIndex];
 
   const initials =
     (firstName ? firstName[0].toUpperCase() : '') +
@@ -44,15 +47,24 @@ export default function Avatar({
 
   return (
     <div
-      className={`relative rounded-full border border-[#E0E0E0] overflow-hidden flex items-center justify-center shrink-0 ${sizeClass} ${!src ? bg : ''} ${className}`}
+      style={{
+        backgroundColor: !src ? bg : undefined,
+        borderColor: 'rgba(255,255,255,0.12)',
+        borderWidth: '1px',
+        borderStyle: 'solid',
+      }}
+      className={`relative rounded-full overflow-hidden flex items-center justify-center shrink-0 ${sizeClass} ${className}`}
     >
       {src ? (
         <img src={src} alt={fullName || 'Avatar'} className="w-full h-full object-cover" />
       ) : (
-        <span className={`font-semibold leading-none ${text}`}>{initials || '?'}</span>
+        <span style={{ color: text }} className="font-semibold leading-none">{initials || '?'}</span>
       )}
       {online && (
-        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#1A7A4A] border-2 border-white" />
+        <span
+          className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full"
+          style={{ background: '#1A7A4A', border: '2px solid #100D0E' }}
+        />
       )}
     </div>
   );

@@ -25,7 +25,20 @@ function timeAgo(dateStr) {
 function VisibilityPill({ visibility }) {
   if (visibility === 'FRIENDS') {
     return (
-      <span className="border border-[#E0E0E0] text-[#404040] text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+      <span
+        style={{
+          border: '1px solid rgba(26,122,74,0.4)',
+          color: '#4ABA80',
+          background: 'rgba(26,122,74,0.1)',
+          fontSize: '10px',
+          padding: '1px 8px',
+          borderRadius: '20px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          flexShrink: 0,
+        }}
+      >
         <Users size={9} />
         Friends
       </span>
@@ -33,15 +46,39 @@ function VisibilityPill({ visibility }) {
   }
   if (visibility === 'FRIENDS_OF_FRIENDS') {
     return (
-      <span className="border border-[#C0C0C0] text-[#0A0A0A] font-medium text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+      <span
+        style={{
+          border: '1px solid rgba(245,240,239,0.15)',
+          color: 'rgba(245,240,239,0.5)',
+          fontSize: '10px',
+          padding: '1px 8px',
+          borderRadius: '20px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          flexShrink: 0,
+        }}
+      >
         <Users size={9} />
         Friends of Friends
       </span>
     );
   }
-  // PUBLIC
   return (
-    <span className="bg-[#0A0A0A] text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+    <span
+      style={{
+        background: 'rgba(139,21,32,0.2)',
+        border: '1px solid rgba(139,21,32,0.4)',
+        color: '#C41E33',
+        fontSize: '10px',
+        padding: '1px 8px',
+        borderRadius: '20px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        flexShrink: 0,
+      }}
+    >
       <Globe size={9} />
       Public
     </span>
@@ -53,40 +90,29 @@ export default function PostCard({ post, onDelete, onUpdate }) {
   const currentUser = useAuthStore((s) => s.user);
   const addToast    = useToastStore((s) => s.addToast);
 
-  /* local post state for optimistic updates */
-  const [localPost,      setLocalPost]      = useState(post);
-  const [commentsOpen,      setCommentsOpen]      = useState(false);
-  const [commentsLoaded,    setCommentsLoaded]    = useState(false);
-  const [editMode,       setEditMode]       = useState(false);
-  const [editContent,    setEditContent]    = useState(post.content);
-  const [saving,         setSaving]         = useState(false);
-  const [deleting,       setDeleting]       = useState(false);
-  const [liking,         setLiking]         = useState(false);
-
-  /* Keep local post in sync if parent post prop changes (e.g. initial load) */
-  // We intentionally manage local state; parent updates flow through onUpdate
+  const [localPost,       setLocalPost]       = useState(post);
+  const [commentsOpen,    setCommentsOpen]    = useState(false);
+  const [commentsLoaded,  setCommentsLoaded]  = useState(false);
+  const [editMode,        setEditMode]        = useState(false);
+  const [editContent,     setEditContent]     = useState(post.content);
+  const [saving,          setSaving]          = useState(false);
+  const [deleting,        setDeleting]        = useState(false);
+  const [liking,          setLiking]          = useState(false);
 
   /* ── like / unlike ── */
   const handleLike = async () => {
     if (liking) return;
     setLiking(true);
-
     const wasLiked = localPost.liked_by_me;
-    // Optimistic update
     setLocalPost((p) => ({
       ...p,
       liked_by_me: !wasLiked,
       like_count:  wasLiked ? p.like_count - 1 : p.like_count + 1,
     }));
-
     try {
-      if (wasLiked) {
-        await unlikePost(localPost.id);
-      } else {
-        await likePost(localPost.id);
-      }
+      if (wasLiked) { await unlikePost(localPost.id); }
+      else          { await likePost(localPost.id); }
     } catch {
-      // Revert on failure
       setLocalPost((p) => ({
         ...p,
         liked_by_me: wasLiked,
@@ -169,7 +195,16 @@ export default function PostCard({ post, onDelete, onUpdate }) {
   const isOwn = localPost.author_id === currentUser?.id;
 
   return (
-    <div className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-4 hover:shadow-sm transition-shadow mb-4">
+    <div
+      style={{
+        background: '#171214',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: '10px',
+        padding: '16px',
+        marginBottom: '10px',
+        transition: 'border-color 0.15s',
+      }}
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <Link
@@ -180,36 +215,41 @@ export default function PostCard({ post, onDelete, onUpdate }) {
           <Avatar
             firstName={localPost.first_name}
             lastName={localPost.last_name}
+            userId={localPost.author_id}
             size="md"
           />
           <div className="min-w-0">
-            <p className="font-semibold text-sm text-[#0A0A0A] truncate group-hover:underline">
+            <p
+              style={{ color: '#F5F0EF', fontWeight: 600, fontSize: '0.875rem' }}
+              className="truncate group-hover:underline"
+            >
               {localPost.first_name} {localPost.last_name}
             </p>
-            <p className="text-xs text-[#888888]">
+            <p style={{ color: 'rgba(245,240,239,0.38)', fontSize: '0.72rem' }}>
               @{localPost.username} · {timeAgo(localPost.created_at)}
             </p>
           </div>
         </Link>
 
-        {/* Right header section */}
         <div className="flex items-center gap-2 shrink-0">
           <VisibilityPill visibility={localPost.visibility} />
-
           {isOwn && (
             <Dropdown
               align="right"
               trigger={
                 <button
                   type="button"
-                  className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#EFEFEF] transition-colors text-[#888888]"
+                  className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-white/5"
+                  style={{ color: 'rgba(245,240,239,0.35)' }}
                   aria-label="Post options"
                 >
-                  <MoreHorizontal size={16} />
+                  <MoreHorizontal size={15} />
                 </button>
               }
             >
-              <DropdownItem onClick={() => { setEditMode(true); setEditContent(localPost.content); }}>
+              <DropdownItem
+                onClick={() => { setEditMode(true); setEditContent(localPost.content); }}
+              >
                 Edit
               </DropdownItem>
               <DropdownDivider />
@@ -229,8 +269,18 @@ export default function PostCard({ post, onDelete, onUpdate }) {
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
               rows={3}
-              className="w-full bg-white border border-[#E0E0E0] rounded-md p-3 text-sm resize-none
-                         focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-colors"
+              style={{
+                width: '100%',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '6px',
+                color: '#F5F0EF',
+                fontSize: '0.875rem',
+                padding: '10px 12px',
+                resize: 'none',
+                outline: 'none',
+                fontFamily: 'inherit',
+              }}
               autoFocus
             />
             <div className="flex gap-2 mt-2">
@@ -247,25 +297,38 @@ export default function PostCard({ post, onDelete, onUpdate }) {
             </div>
           </div>
         ) : (
-          <p className="text-sm leading-relaxed text-[#0A0A0A] whitespace-pre-line">
+          <p
+            style={{
+              color: '#F5F0EF',
+              fontSize: '0.875rem',
+              lineHeight: '1.65',
+              whiteSpace: 'pre-line',
+            }}
+          >
             {localPost.content}
           </p>
         )}
       </div>
 
       {/* Engagement bar */}
-      <div className="border-t border-[#E0E0E0] pt-3 mt-3 flex items-center justify-between">
-        <div className="flex items-center gap-1">
+      <div
+        className="flex items-center justify-between pt-3 mt-3"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
+      >
+        <div className="flex items-center gap-0.5">
           {/* Like */}
           <button
             type="button"
             onClick={handleLike}
-            className={`flex items-center gap-1.5 text-sm transition-colors cursor-pointer rounded-md px-2 py-1 hover:bg-[#EFEFEF]
-              ${localPost.liked_by_me ? 'text-[#0A0A0A] font-medium' : 'text-[#888888] hover:text-[#0A0A0A]'}`}
+            className="flex items-center gap-1.5 text-sm transition-colors cursor-pointer rounded-md px-2 py-1 hover:bg-white/5"
+            style={{
+              color: localPost.liked_by_me ? '#C41E33' : 'rgba(245,240,239,0.38)',
+              fontWeight: localPost.liked_by_me ? 600 : 400,
+            }}
           >
             <ThumbsUp
-              size={16}
-              className={localPost.liked_by_me ? 'fill-[#0A0A0A]' : ''}
+              size={15}
+              style={{ fill: localPost.liked_by_me ? '#C41E33' : 'none', stroke: localPost.liked_by_me ? '#C41E33' : 'currentColor' }}
             />
             <span>{localPost.like_count || 0}</span>
           </button>
@@ -274,17 +337,23 @@ export default function PostCard({ post, onDelete, onUpdate }) {
           <button
             type="button"
             onClick={handleToggleComments}
-            className="flex items-center gap-1.5 text-sm text-[#888888] hover:text-[#0A0A0A] transition-colors rounded-md px-2 py-1 hover:bg-[#EFEFEF]"
+            className="flex items-center gap-1.5 text-sm transition-colors rounded-md px-2 py-1 hover:bg-white/5"
+            style={{ color: 'rgba(245,240,239,0.38)' }}
           >
-            <MessageSquare size={16} />
+            <MessageSquare size={15} />
             <span>{localPost.comment_count || 0}</span>
           </button>
         </div>
 
         {/* Share */}
-        <Button variant="ghost" size="sm" onClick={handleShare} className="text-[#888888]">
+        <button
+          type="button"
+          onClick={handleShare}
+          className="flex items-center gap-1.5 text-sm transition-colors rounded-md px-2 py-1 hover:bg-white/5"
+          style={{ color: 'rgba(245,240,239,0.38)' }}
+        >
           <Share2 size={14} />
-        </Button>
+        </button>
       </div>
 
       {/* Comment thread */}
