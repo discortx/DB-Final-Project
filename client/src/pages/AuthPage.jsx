@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { register, login } from '../api/auth';
 import useAuthStore from '../store/authStore';
@@ -8,237 +8,191 @@ import socket from '../socket';
 
 /* ─── Injected CSS ───────────────────────────────────────────────────────────── */
 const AUTH_CSS = `
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to   { opacity: 1; transform: translateY(0);    }
+  /* Orb drift animations */
+  @keyframes orb1 {
+    0%,100% { transform: translate(0,0) scale(1); }
+    33%  { transform: translate(42px,-28px) scale(1.08); }
+    66%  { transform: translate(-18px,36px) scale(0.93); }
+  }
+  @keyframes orb2 {
+    0%,100% { transform: translate(0,0) scale(1); }
+    25%  { transform: translate(-38px,22px) scale(1.06); }
+    50%  { transform: translate(25px,-42px) scale(0.95); }
+    75%  { transform: translate(-12px,-18px) scale(1.04); }
+  }
+  @keyframes orb3 {
+    0%,100% { transform: translate(0,0) scale(1); }
+    40%  { transform: translate(28px,38px) scale(0.91); }
+    70%  { transform: translate(-44px,-22px) scale(1.07); }
+  }
+  @keyframes orb4 {
+    0%,100% { transform: translate(0,0) scale(1); }
+    30%  { transform: translate(-30px,-40px) scale(1.1); }
+    60%  { transform: translate(35px,15px) scale(0.92); }
   }
 
+  /* Grid scroll */
+  @keyframes gridScroll {
+    from { background-position: 0 0; }
+    to   { background-position: 0 60px; }
+  }
+
+  /* Card shake on error */
+  @keyframes cardShake {
+    0%,100% { transform: translateX(0); }
+    15% { transform: translateX(-8px); }
+    30% { transform: translateX(7px); }
+    45% { transform: translateX(-5px); }
+    60% { transform: translateX(5px); }
+    75% { transform: translateX(-3px); }
+    90% { transform: translateX(2px); }
+  }
+
+  /* Input focus ring pulse */
+  @keyframes focusPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(196,30,51,0.55), inset 0 0 0 1px #C41E33; }
+    70%  { box-shadow: 0 0 0 7px rgba(196,30,51,0), inset 0 0 0 1px #C41E33; }
+    100% { box-shadow: 0 0 0 0 rgba(196,30,51,0), inset 0 0 0 1px #C41E33; }
+  }
+
+  /* Reduced motion */
   @media (prefers-reduced-motion: reduce) {
-    .auth-anim {
-      animation: none !important;
-      opacity: 1 !important;
-      transform: none !important;
-    }
+    .auth-orb, .auth-grid { animation: none !important; }
   }
 
-  /* ── Input ──────────────────────────────────────────────────────────── */
-  .auth-input {
+  /* Input / select */
+  .auth-input, .auth-select {
     width: 100%;
     height: 46px;
-    background: #1A1517;
+    background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 6px;
+    border-radius: 8px;
     color: #F5F0EF;
     font-family: 'DM Sans', sans-serif;
-    font-size: 0.88rem;
+    font-size: 0.875rem;
     font-weight: 300;
-    padding: 0 1rem;
+    padding: 0 14px;
     outline: none;
     box-sizing: border-box;
-    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
     display: block;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
   }
-  .auth-input:focus {
-    border-color: #8B1520;
-    background: rgba(139,21,32,0.06);
-    box-shadow: 0 0 0 3px rgba(139,21,32,0.1);
+  .auth-input:focus, .auth-select:focus {
+    border-color: #C41E33;
+    background: rgba(196,30,51,0.06);
+    animation: focusPulse 0.65s ease-out;
   }
-  .auth-input::placeholder { color: rgba(245,240,239,0.2); }
+  .auth-input::placeholder { color: rgba(245,240,239,0.3); }
   .auth-input[type="date"] { color-scheme: dark; }
   .auth-input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: invert(1) opacity(0.3);
+    filter: invert(0.6) sepia(1) saturate(0.5) hue-rotate(320deg);
     cursor: pointer;
+    opacity: 0.7;
   }
 
-  /* ── Submit button ──────────────────────────────────────────────────── */
-  .auth-submit-btn {
+  /* Select */
+  .auth-select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='rgba(245,240,239,0.45)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+    cursor: pointer;
+  }
+  .auth-select option { background: #1A1517; color: #F5F0EF; }
+
+  /* Submit button */
+  .auth-submit {
     width: 100%;
     height: 48px;
-    background: #8B1520;
+    background: #C41E33;
     border: none;
-    border-radius: 6px;
+    border-radius: 8px;
     color: #F5F0EF;
     font-family: 'DM Sans', sans-serif;
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     font-weight: 500;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
     cursor: pointer;
-    position: relative;
-    overflow: hidden;
-    transition: background-color 0.2s ease, transform 0.1s ease;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
   }
-  .auth-submit-btn::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.06) 50%, transparent 60%);
-    background-size: 200% 100%;
-    background-position: 100% 0;
-    transition: background-position 0.4s ease;
-    pointer-events: none;
+  .auth-submit:hover:not(:disabled) {
+    background: #A8192B;
+    box-shadow: 0 0 24px rgba(196,30,51,0.45);
   }
-  .auth-submit-btn:hover:not(:disabled)         { background: #A8192B; }
-  .auth-submit-btn:hover:not(:disabled)::after  { background-position: 0% 0; }
-  .auth-submit-btn:active:not(:disabled)        { background: #720F1A; transform: scale(0.985); }
-  .auth-submit-btn:disabled                     { opacity: 0.6; cursor: not-allowed; }
+  .auth-submit:active:not(:disabled) {
+    transform: scale(0.97);
+    background: #720F1A;
+  }
+  .auth-submit:disabled { opacity: 0.55; cursor: not-allowed; }
 
-  /* ── Tab buttons ────────────────────────────────────────────────────── */
-  .auth-tab-btn {
-    flex: 1;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0 0 0.9rem;
+  /* Form cross-fade */
+  .auth-form-wrap { transition: opacity 0.2s ease, transform 0.2s ease; }
+  .auth-form-wrap.fading { opacity: 0; transform: translateY(-5px); }
+
+  /* Error strip */
+  .auth-error-strip {
+    background: rgba(139,21,32,0.2);
+    border: 1px solid rgba(196,30,51,0.45);
+    border-radius: 8px;
+    padding: 10px 12px;
     font-family: 'DM Sans', sans-serif;
-    font-size: 0.72rem;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: rgba(245,240,239,0.35);
-    position: relative;
-    transition: color 0.2s;
-    text-align: center;
+    font-size: 0.78rem;
+    color: #E87080;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
-  .auth-tab-btn.active { color: #F5F0EF; }
-  .auth-tab-btn.active::after {
-    content: '';
-    position: absolute;
-    bottom: -1px;
-    left: 10%;
-    right: 10%;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, #C41E33, transparent);
-    border-radius: 1px;
-  }
-  .auth-tab-btn:hover:not(.active) { color: rgba(245,240,239,0.65); }
 
-  /* ── Card ───────────────────────────────────────────────────────────── */
-  .auth-card {
-    background: #141011;
-    border: 1px solid rgba(139,21,32,0.35);
-    border-radius: 16px;
-    padding: 2.8rem 2.6rem;
-    position: relative;
-    width: 440px;
-    max-width: calc(100vw - 2rem);
-    box-sizing: border-box;
-  }
-  .auth-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(139,21,32,0.1) 0%, transparent 60%);
-    pointer-events: none;
-    z-index: 0;
-  }
-  .auth-card::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 15%;
-    right: 15%;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(196,30,51,0.6), transparent);
-    z-index: 1;
-  }
-  .auth-card-inner {
-    position: relative;
-    z-index: 2;
-  }
-  .auth-card.register-mode {
-    max-height: 90vh;
+  /* Scrollable card in register mode */
+  .auth-card-register {
+    max-height: 92vh;
     overflow-y: auto;
     overflow-x: hidden;
   }
-  .auth-card::-webkit-scrollbar       { width: 3px; }
-  .auth-card::-webkit-scrollbar-track { background: transparent; }
-  .auth-card::-webkit-scrollbar-thumb { background: rgba(139,21,32,0.4); border-radius: 3px; }
+  .auth-card-register::-webkit-scrollbar       { width: 3px; }
+  .auth-card-register::-webkit-scrollbar-track { background: transparent; }
+  .auth-card-register::-webkit-scrollbar-thumb { background: rgba(139,21,32,0.5); border-radius: 3px; }
 
-  /* ── Form content transition (tab switch) ───────────────────────────── */
-  .auth-form-content {
-    transition: opacity 0.22s ease-out, transform 0.22s ease-out;
-  }
-  .auth-form-content.hidden {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-
-  /* ── Gender pills ───────────────────────────────────────────────────── */
-  .auth-gender-pill {
-    background: #1A1517;
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 20px;
-    color: rgba(245,240,239,0.45);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.78rem;
-    font-weight: 400;
-    padding: 7px 14px;
-    cursor: pointer;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
-  }
-  .auth-gender-pill:hover              { border-color: rgba(255,255,255,0.11); color: #F5F0EF; }
-  .auth-gender-pill.selected           { background: rgba(139,21,32,0.15); border-color: rgba(196,30,51,0.5); color: #E87080; }
-
-  /* ── Misc ───────────────────────────────────────────────────────────── */
-  .auth-link              { color: #C41E33; text-decoration: none; transition: opacity 0.15s; }
-  .auth-link:hover        { opacity: 0.7; }
-
-  .auth-dot-grid {
-    position: absolute;
-    inset: 0;
-    background-image: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-    background-size: 28px 28px;
-    opacity: 0.4;
-    -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
-    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
-    pointer-events: none;
-  }
-
-  /* ── Responsive ─────────────────────────────────────────────────────── */
-  @media (max-width: 480px) {
-    .auth-card {
-      width: calc(100vw - 1.5rem);
-      padding: 2rem 1.4rem;
-      border-radius: 12px;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-    .auth-name-row {
-      grid-template-columns: 1fr !important;
-    }
-    .auth-page-wrap {
-      align-items: flex-start !important;
-      padding-top: 1.5rem;
-      min-height: 100svh;
-    }
+  /* Responsive name row stack */
+  @media (max-width: 500px) {
+    .auth-name-row { grid-template-columns: 1fr !important; }
   }
 `;
 
-/* ─── Animation helper ───────────────────────────────────────────────────────── */
-const anim = (delay, duration = '0.5s') => ({
-  opacity: 0,
-  animation: `fadeUp ${duration} cubic-bezier(0.16,1,0.3,1) ${delay} both`,
-});
+/* ─── Orb configuration ──────────────────────────────────────────────────────── */
+const ORBS = [
+  { w: 220, top: '8%',  left: '3%',  blur: 80, anim: 'orb1', dur: '18s', delay: '0s'  },
+  { w: 150, top: '55%', left: '7%',  blur: 60, anim: 'orb2', dur: '14s', delay: '-3s' },
+  { w: 185, top: '14%', left: '66%', blur: 70, anim: 'orb3', dur: '22s', delay: '-7s' },
+  { w: 100, top: '70%', left: '79%', blur: 50, anim: 'orb4', dur: '10s', delay: '-5s' },
+  { w: 135, top: '38%', left: '88%', blur: 55, anim: 'orb1', dur: '16s', delay: '-2s' },
+  { w: 195, top: '82%', left: '42%', blur: 75, anim: 'orb2', dur: '20s', delay: '-8s' },
+  { w: 88,  top: '4%',  left: '49%', blur: 40, anim: 'orb3', dur: '12s', delay: '-4s' },
+  { w: 165, top: '48%', left: '27%', blur: 65, anim: 'orb4', dur: '15s', delay: '-6s' },
+];
 
 /* ─── Shared label style ─────────────────────────────────────────────────────── */
 const labelStyle = {
   display: 'block',
-  fontSize: '0.65rem',
   fontFamily: "'DM Sans', sans-serif",
+  fontSize: '0.67rem',
   fontWeight: 500,
   letterSpacing: '0.1em',
   textTransform: 'uppercase',
-  color: 'rgba(245,240,239,0.22)',
-  marginBottom: '0.5rem',
+  color: 'rgba(245,240,239,0.4)',
+  marginBottom: '7px',
 };
 
-/* ─── Preserved logic helpers ────────────────────────────────────────────────── */
+/* ─── Logic helpers (preserved) ─────────────────────────────────────────────── */
 function calcPasswordStrength(pw) {
   let score = 0;
   if (pw.length >= 8) score++;
@@ -274,17 +228,16 @@ function validateUsername(val) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/* ─── Small UI atoms ─────────────────────────────────────────────────────────── */
+/* ─── Atoms ──────────────────────────────────────────────────────────────────── */
 function FieldError({ msg }) {
   if (!msg) return null;
   return (
     <p style={{
-      display: 'flex', alignItems: 'center', gap: '5px',
-      marginTop: '4px', fontSize: '0.7rem', color: '#E87080',
+      display: 'flex', alignItems: 'center', gap: '4px',
+      marginTop: '5px', fontSize: '0.7rem', color: '#E87080',
       fontFamily: "'DM Sans', sans-serif",
-      opacity: 1, transition: 'opacity 0.15s',
     }}>
-      <AlertCircle size={11} />
+      <AlertCircle size={11} style={{ flexShrink: 0 }} />
       {msg}
     </p>
   );
@@ -292,8 +245,7 @@ function FieldError({ msg }) {
 
 const EyeOpen = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-    <circle cx="12" cy="12" r="3" />
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
   </svg>
 );
 
@@ -304,30 +256,55 @@ const EyeClosed = () => (
   </svg>
 );
 
-function LogoMark({ size = 36 }) {
+/* ─── Background scene (fixed, z-index 0) ────────────────────────────────────── */
+function BackgroundScene() {
   return (
-    <svg width={size} height={size} viewBox="0 0 80 80" fill="none">
-      <path d="M56,24 C56,15 49,8 40,8 C31,8 24,15 24,24 C24,33 31,40 40,40"
-        stroke="#8B1520" strokeWidth="11" strokeLinecap="round" />
-      <path d="M40,40 C49,40 56,47 56,56 C56,65 49,72 40,72 C31,72 24,65 24,56"
-        stroke="#F5F0EF" strokeWidth="11" strokeLinecap="round" />
-    </svg>
-  );
-}
+    <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+      {/* Scrolling grid */}
+      <div
+        className="auth-grid"
+        style={{
+          position: 'absolute', inset: 0,
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), ' +
+            'linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+          animation: 'gridScroll 10s linear infinite',
+        }}
+      />
 
-function SubmitBtn({ loading, disabled, children }) {
-  return (
-    <button type="submit" className="auth-submit-btn" disabled={disabled}>
-      {loading && <Loader2 size={14} className="animate-spin" />}
-      {children}
-    </button>
+      {/* Floating crimson orbs */}
+      {ORBS.map((orb, i) => (
+        <div
+          key={i}
+          className="auth-orb"
+          style={{
+            position: 'absolute',
+            width: orb.w, height: orb.w,
+            top: orb.top, left: orb.left,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(196,30,51,0.18), transparent 70%)',
+            filter: `blur(${orb.blur}px)`,
+            animation: `${orb.anim} ${orb.dur} ease-in-out infinite`,
+            animationDelay: orb.delay,
+            willChange: 'transform',
+          }}
+        />
+      ))}
+
+      {/* Radial vignette — darkens corners, draws eye to center */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse 78% 78% at 50% 50%, transparent 32%, rgba(8,6,7,0.78) 100%)',
+      }} />
+    </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════
    LOGIN FORM — logic preserved verbatim
 ═══════════════════════════════════════════════════════════════ */
-function LoginForm() {
+function LoginForm({ onShake, onSwitchTab }) {
   const navigate = useNavigate();
   const { login: storeLogin } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
@@ -357,7 +334,9 @@ function LoginForm() {
       addToast({ message: `Welcome back, ${res.data.user.first_name}!`, type: 'success' });
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Something went wrong');
+      const msg = err.response?.data?.error || 'Something went wrong';
+      setError(msg);
+      onShake?.();
     } finally {
       setLoading(false);
     }
@@ -366,112 +345,86 @@ function LoginForm() {
   const eyeBtn = {
     position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
     background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-    color: showPassword ? '#C41E33' : 'rgba(245,240,239,0.22)',
-    display: 'flex', alignItems: 'center',
-    transition: 'color 0.15s',
+    color: showPassword ? '#C41E33' : 'rgba(245,240,239,0.35)',
+    display: 'flex', alignItems: 'center', transition: 'color 0.15s',
   };
 
   return (
     <div>
-      {/* Heading */}
-      <h1 className="auth-anim" style={{
-        fontFamily: "'Cormorant Garamond', serif", fontWeight: 700,
-        fontSize: '2rem', color: '#F5F0EF', marginBottom: '0.3rem', lineHeight: 1.1,
-        ...anim('0.4s', '0.5s'),
-      }}>
+      <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, fontSize: '1.75rem', color: '#F5F0EF', marginBottom: '0.3rem', lineHeight: 1.1 }}>
         Welcome back.
-      </h1>
-
-      {/* Subtext */}
-      <p className="auth-anim" style={{
-        fontFamily: "'DM Sans', sans-serif", fontWeight: 300,
-        fontSize: '0.8rem', color: 'rgba(245,240,239,0.45)', marginBottom: '1.8rem',
-        ...anim('0.45s', '0.4s'),
-      }}>
+      </h2>
+      <p style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: '0.8rem', color: 'rgba(245,240,239,0.45)', marginBottom: '1.6rem' }}>
         Enter your credentials to continue.
       </p>
 
       <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
         {/* Email */}
-        <div className="auth-anim" style={anim('0.5s', '0.4s')}>
+        <div>
           <label style={labelStyle}>Email</label>
           <input
-            type="email"
-            className="auth-input"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="email" className="auth-input"
+            value={email} onChange={(e) => setEmail(e.target.value)}
             onBlur={() => setTouched((t) => ({ ...t, email: true }))}
-            autoComplete="email"
-            autoFocus
-            placeholder="you@example.com"
+            autoComplete="email" autoFocus placeholder="you@example.com"
             style={{ borderColor: emailError ? '#8B1520' : undefined, caretColor: '#C41E33' }}
           />
           <FieldError msg={emailError} />
         </div>
 
         {/* Password */}
-        <div className="auth-anim" style={anim('0.56s', '0.4s')}>
+        <div>
           <label style={labelStyle}>Password</label>
           <div style={{ position: 'relative' }}>
             <input
-              type={showPassword ? 'text' : 'password'}
-              className="auth-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              type={showPassword ? 'text' : 'password'} className="auth-input"
+              value={password} onChange={(e) => setPassword(e.target.value)}
               onBlur={() => setTouched((t) => ({ ...t, password: true }))}
-              autoComplete="current-password"
-              placeholder="••••••••"
+              autoComplete="current-password" placeholder="••••••••"
               style={{ paddingRight: '44px', borderColor: passwordError ? '#8B1520' : undefined, caretColor: '#C41E33' }}
             />
-            <button type="button" tabIndex={-1} aria-label={showPassword ? 'Hide password' : 'Show password'}
-              onClick={() => setShowPassword((v) => !v)} style={eyeBtn}>
+            <button type="button" tabIndex={-1} onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'} style={eyeBtn}>
               {showPassword ? <EyeOpen /> : <EyeClosed />}
             </button>
           </div>
           <FieldError msg={passwordError} />
         </div>
 
-        {/* Forgot password */}
-        <div className="auth-anim" style={{ textAlign: 'right', marginTop: '0.2rem', ...anim('0.62s', '0.4s') }}>
-          <a href="#" className="auth-link"
-            style={{ fontSize: '0.73rem', fontFamily: "'DM Sans', sans-serif", fontWeight: 400 }}>
+        {/* Forgot */}
+        <div style={{ textAlign: 'right', marginTop: '-4px' }}>
+          <a href="#" style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.73rem', color: '#C41E33', textDecoration: 'none', transition: 'opacity 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.65'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
             Forgot password?
           </a>
         </div>
 
-        {/* Server error */}
+        {/* Error */}
         {error && (
-          <div style={{
-            background: 'rgba(139,21,32,0.12)', border: '1px solid #8B1520',
-            borderRadius: '6px', padding: '10px 12px',
-            fontSize: '0.78rem', color: '#E87080',
-            display: 'flex', alignItems: 'center', gap: '8px',
-            fontFamily: "'DM Sans', sans-serif",
-          }}>
+          <div className="auth-error-strip">
             <AlertCircle size={14} style={{ flexShrink: 0 }} />
             {error}
           </div>
         )}
 
-        {/* Submit */}
-        <div className="auth-anim" style={{ marginTop: '0.4rem', ...anim('0.7s', '0.4s') }}>
-          <SubmitBtn loading={loading} disabled={!canSubmit}>
-            {loading ? 'Signing in…' : 'Sign in'}
-          </SubmitBtn>
-        </div>
-
+        <button type="submit" className="auth-submit" disabled={!canSubmit}>
+          {loading && <Loader2 size={14} className="animate-spin" />}
+          {loading ? 'Signing in…' : 'Sign In'}
+        </button>
       </form>
 
-      {/* Bottom row */}
-      <p className="auth-anim" style={{
-        textAlign: 'center', marginTop: '1.4rem',
-        fontSize: '0.78rem', fontWeight: 300,
-        color: 'rgba(245,240,239,0.45)', fontFamily: "'DM Sans', sans-serif",
-        ...anim('0.76s', '0.35s'),
-      }}>
-        New to Sora Link?{' '}
-        <Link to="/register" className="auth-link">Create an account</Link>
+      <p style={{ textAlign: 'center', marginTop: '1.4rem', fontSize: '0.78rem', fontFamily: "'DM Sans', sans-serif", color: 'rgba(245,240,239,0.45)' }}>
+        Don't have an account?{' '}
+        <button type="button" onClick={onSwitchTab} style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: '#C41E33', fontFamily: "'DM Sans', sans-serif",
+          fontSize: '0.78rem', padding: 0, transition: 'opacity 0.15s',
+        }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+          Sign up
+        </button>
       </p>
     </div>
   );
@@ -480,7 +433,7 @@ function LoginForm() {
 /* ═══════════════════════════════════════════════════════════════
    REGISTER FORM — logic preserved verbatim
 ═══════════════════════════════════════════════════════════════ */
-function RegisterForm() {
+function RegisterForm({ onShake, onSwitchTab }) {
   const navigate = useNavigate();
   const { login: storeLogin } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
@@ -492,7 +445,7 @@ function RegisterForm() {
   const [password,     setPassword]     = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [dob,          setDob]          = useState('');
-  const [gender,       setGender]       = useState(null);
+  const [gender,       setGender]       = useState('');
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState('');
   const [touched, setTouched] = useState({
@@ -533,7 +486,9 @@ function RegisterForm() {
       addToast({ message: `Welcome, ${res.data.user.first_name}!`, type: 'success' });
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Something went wrong');
+      const msg = err.response?.data?.error || 'Something went wrong';
+      setError(msg);
+      onShake?.();
     } finally {
       setLoading(false);
     }
@@ -542,87 +497,59 @@ function RegisterForm() {
   const eyeBtn = {
     position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
     background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-    color: showPassword ? '#C41E33' : 'rgba(245,240,239,0.22)',
-    display: 'flex', alignItems: 'center',
-    transition: 'color 0.15s',
+    color: showPassword ? '#C41E33' : 'rgba(245,240,239,0.35)',
+    display: 'flex', alignItems: 'center', transition: 'color 0.15s',
   };
-
-  const genderOptions = [
-    { label: 'Male',              value: 'MALE'   },
-    { label: 'Female',            value: 'FEMALE' },
-    { label: 'Prefer not to say', value: null     },
-  ];
 
   return (
     <div>
-      {/* Heading */}
-      <h1 className="auth-anim" style={{
-        fontFamily: "'Cormorant Garamond', serif", fontWeight: 700,
-        fontSize: '2rem', color: '#F5F0EF', marginBottom: '0.3rem', lineHeight: 1.1,
-        ...anim('0.4s', '0.5s'),
-      }}>
+      <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, fontSize: '1.75rem', color: '#F5F0EF', marginBottom: '0.3rem', lineHeight: 1.1 }}>
         Create your account.
-      </h1>
-
-      {/* Subtext */}
-      <p className="auth-anim" style={{
-        fontFamily: "'DM Sans', sans-serif", fontWeight: 300,
-        fontSize: '0.8rem', color: 'rgba(245,240,239,0.45)', marginBottom: '1.8rem',
-        ...anim('0.45s', '0.4s'),
-      }}>
+      </h2>
+      <p style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: '0.8rem', color: 'rgba(245,240,239,0.45)', marginBottom: '1.6rem' }}>
         Fill in your details to get started.
       </p>
 
       <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-
         {/* First + Last name */}
-        <div className="auth-anim auth-name-row"
-          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', ...anim('0.5s', '0.4s') }}>
+        <div className="auth-name-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           <div>
             <label style={labelStyle}>First Name</label>
             <input type="text" className="auth-input"
               value={firstName} onChange={(e) => setFirstName(e.target.value)} onBlur={() => touch('firstName')}
-              placeholder="Jane"
-              style={{ borderColor: firstNameError ? '#8B1520' : undefined }} />
+              placeholder="Jane" style={{ borderColor: firstNameError ? '#8B1520' : undefined }} />
             <FieldError msg={firstNameError} />
           </div>
           <div>
             <label style={labelStyle}>Last Name</label>
             <input type="text" className="auth-input"
               value={lastName} onChange={(e) => setLastName(e.target.value)} onBlur={() => touch('lastName')}
-              placeholder="Smith"
-              style={{ borderColor: lastNameError ? '#8B1520' : undefined }} />
+              placeholder="Smith" style={{ borderColor: lastNameError ? '#8B1520' : undefined }} />
             <FieldError msg={lastNameError} />
           </div>
         </div>
 
         {/* Username */}
-        <div className="auth-anim" style={anim('0.56s', '0.4s')}>
-          <label style={labelStyle}>Username</label>
+        <div>
+          <label style={labelStyle}>
+            Username <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 300 }}>(8–12 chars)</span>
+          </label>
           <div style={{ position: 'relative' }}>
             <input type="text" className="auth-input"
               value={username} onChange={(e) => setUsername(e.target.value)} onBlur={() => touch('username')}
               minLength={8} maxLength={12} placeholder="cooluser99"
-              style={{
-                paddingRight: '36px',
-                borderColor: usernameError ? '#8B1520' : usernameValid ? '#1A7A4A' : undefined,
-              }} />
+              style={{ paddingRight: '36px', borderColor: usernameError ? '#8B1520' : usernameValid ? '#1A7A4A' : undefined }} />
             {username.length > 0 && (
               <span style={{ position: 'absolute', right: '11px', top: '50%', transform: 'translateY(-50%)' }}>
-                {usernameValid
-                  ? <CheckCircle2 size={14} color="#1A7A4A" />
-                  : <XCircle     size={14} color="#8B1520"  />}
+                {usernameValid ? <CheckCircle2 size={14} color="#1A7A4A" /> : <XCircle size={14} color="#8B1520" />}
               </span>
             )}
           </div>
-          <p style={{ marginTop: '4px', fontSize: '0.68rem', color: 'rgba(245,240,239,0.22)', fontFamily: "'DM Sans', sans-serif" }}>
-            8–12 characters, no spaces
-          </p>
           <FieldError msg={usernameError} />
         </div>
 
         {/* Email */}
-        <div className="auth-anim" style={anim('0.62s', '0.4s')}>
+        <div>
           <label style={labelStyle}>Email</label>
           <input type="email" className="auth-input"
             value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => touch('email')}
@@ -632,15 +559,15 @@ function RegisterForm() {
         </div>
 
         {/* Password */}
-        <div className="auth-anim" style={anim('0.68s', '0.4s')}>
+        <div>
           <label style={labelStyle}>Password</label>
           <div style={{ position: 'relative' }}>
             <input type={showPassword ? 'text' : 'password'} className="auth-input"
               value={password} onChange={(e) => setPassword(e.target.value)} onBlur={() => touch('password')}
               autoComplete="new-password" minLength={8} placeholder="••••••••"
               style={{ paddingRight: '44px', borderColor: passwordError ? '#8B1520' : undefined, caretColor: '#C41E33' }} />
-            <button type="button" tabIndex={-1} aria-label={showPassword ? 'Hide password' : 'Show password'}
-              onClick={() => setShowPassword((v) => !v)} style={eyeBtn}>
+            <button type="button" tabIndex={-1} onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'} style={eyeBtn}>
               {showPassword ? <EyeOpen /> : <EyeClosed />}
             </button>
           </div>
@@ -649,131 +576,109 @@ function RegisterForm() {
         </div>
 
         {/* Date of birth */}
-        <div className="auth-anim" style={anim('0.74s', '0.4s')}>
-          <label style={labelStyle}>Date of Birth <span style={{ textTransform: 'none', letterSpacing: 0, opacity: 0.6 }}>(optional)</span></label>
+        <div>
+          <label style={labelStyle}>
+            Date of Birth <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 300, opacity: 0.7 }}>(optional)</span>
+          </label>
           <input type="date" className="auth-input" value={dob} onChange={(e) => setDob(e.target.value)} />
         </div>
 
         {/* Gender */}
-        <div className="auth-anim" style={anim('0.80s', '0.4s')}>
-          <label style={{ ...labelStyle, marginBottom: '10px' }}>
-            Gender <span style={{ textTransform: 'none', letterSpacing: 0, opacity: 0.6 }}>(optional)</span>
+        <div>
+          <label style={labelStyle}>
+            Gender <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 300, opacity: 0.7 }}>(optional)</span>
           </label>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {genderOptions.map((opt) => (
-              <button key={opt.label} type="button"
-                className={`auth-gender-pill${gender === opt.value ? ' selected' : ''}`}
-                onClick={() => setGender(opt.value)}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          <select className="auth-select" value={gender} onChange={(e) => setGender(e.target.value)}>
+            <option value="">Prefer not to say</option>
+            <option value="MALE">Male</option>
+            <option value="FEMALE">Female</option>
+          </select>
         </div>
 
-        {/* Server error */}
+        {/* Error */}
         {error && (
-          <div style={{
-            background: 'rgba(139,21,32,0.12)', border: '1px solid #8B1520',
-            borderRadius: '6px', padding: '10px 12px',
-            fontSize: '0.78rem', color: '#E87080',
-            display: 'flex', alignItems: 'center', gap: '8px',
-            fontFamily: "'DM Sans', sans-serif",
-          }}>
+          <div className="auth-error-strip">
             <AlertCircle size={14} style={{ flexShrink: 0 }} />
             {error}
           </div>
         )}
 
-        {/* Submit */}
-        <div className="auth-anim" style={{ marginTop: '0.4rem', ...anim('0.88s', '0.4s') }}>
-          <SubmitBtn loading={loading} disabled={!canSubmit}>
-            {loading ? 'Creating account…' : 'Create account'}
-          </SubmitBtn>
-        </div>
-
+        <button type="submit" className="auth-submit" disabled={!canSubmit}>
+          {loading && <Loader2 size={14} className="animate-spin" />}
+          {loading ? 'Creating account…' : 'Create Account'}
+        </button>
       </form>
 
-      {/* Bottom row */}
-      <p className="auth-anim" style={{
-        textAlign: 'center', marginTop: '1.4rem',
-        fontSize: '0.78rem', fontWeight: 300,
-        color: 'rgba(245,240,239,0.45)', fontFamily: "'DM Sans', sans-serif",
-        ...anim('0.94s', '0.35s'),
-      }}>
+      <p style={{ textAlign: 'center', marginTop: '1.4rem', fontSize: '0.78rem', fontFamily: "'DM Sans', sans-serif", color: 'rgba(245,240,239,0.45)' }}>
         Already have an account?{' '}
-        <Link to="/login" className="auth-link">Sign in</Link>
+        <button type="button" onClick={onSwitchTab} style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: '#C41E33', fontFamily: "'DM Sans', sans-serif",
+          fontSize: '0.78rem', padding: 0, transition: 'opacity 0.15s',
+        }}
+          onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
+          onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+          Sign in
+        </button>
       </p>
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   AUTH PAGE — centered card layout
+   AUTH PAGE — glassmorphism card layout
 ═══════════════════════════════════════════════════════════════ */
 export default function AuthPage({ mode }) {
   const navigate = useNavigate();
-  const isLogin = mode === 'login';
 
-  /* Tab switch animation state */
-  const [displayedMode, setDisplayedMode] = useState(mode);
-  const [formVisible,   setFormVisible]   = useState(true);
+  const [activeTab,  setActiveTab]  = useState(mode);
+  const [formFading, setFormFading] = useState(false);
+  const [mounted,    setMounted]    = useState(false);
+  const cardRef = useRef(null);
 
+  // Card slide-up on first paint
   useEffect(() => {
-    if (mode === displayedMode) return;
-    setFormVisible(false);
-    const t = setTimeout(() => {
-      setDisplayedMode(mode);
-      setFormVisible(true);
-    }, 220);
-    return () => clearTimeout(t);
+    const raf = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Sync tab with direct URL navigation
+  useEffect(() => {
+    if (mode !== activeTab) setActiveTab(mode);
   }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleTabClick = (path) => {
-    if (path === `/${mode}`) return;
-    navigate(path);
-  };
+  // Trigger horizontal shake via direct DOM animation (avoids CSS animation conflicts)
+  const triggerShake = useCallback(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    el.style.animation = 'none';
+    void el.offsetWidth;
+    el.style.animation = 'cardShake 600ms cubic-bezier(0.36,0.07,0.19,0.97)';
+    el.addEventListener('animationend', () => { el.style.animation = ''; }, { once: true });
+  }, []);
+
+  // Tab switch: fade out → swap content → fade in
+  const switchTab = useCallback((tab) => {
+    if (tab === activeTab) return;
+    setFormFading(true);
+    setTimeout(() => {
+      setActiveTab(tab);
+      setFormFading(false);
+      navigate(`/${tab}`, { replace: true });
+    }, 200);
+  }, [activeTab, navigate]);
+
+  const isLogin = activeTab === 'login';
 
   return (
-    <div style={{ background: '#080607', minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ background: '#080607', minHeight: '100vh', position: 'relative' }}>
       <style>{AUTH_CSS}</style>
 
-      {/* ── Background layers ──────────────────────────────────────────── */}
+      <BackgroundScene />
 
-      {/* Layer 1 — upper-left radial glow */}
-      <div aria-hidden="true" style={{
-        position: 'fixed', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse 70% 60% at 30% 40%, rgba(139,21,32,0.12) 0%, transparent 65%)',
-      }} />
-
-      {/* Layer 2 — lower-right radial glow */}
-      <div aria-hidden="true" style={{
-        position: 'fixed', inset: 0, pointerEvents: 'none',
-        background: 'radial-gradient(ellipse 40% 35% at 75% 70%, rgba(139,21,32,0.07) 0%, transparent 60%)',
-      }} />
-
-      {/* Layer 3 — dot grid */}
-      <div aria-hidden="true" className="auth-dot-grid" style={{ position: 'fixed' }} />
-
-      {/* Layer 4 — watermark S-logo */}
-      <div aria-hidden="true" style={{
-        position: 'fixed',
-        top: '50%', left: '50%',
-        transform: 'translate(calc(-50% - 80px), calc(-50% - 40px))',
-        opacity: 0.04,
-        pointerEvents: 'none',
-        zIndex: 0,
-      }}>
-        <svg width="600" height="600" viewBox="0 0 80 80" fill="none">
-          <path d="M56,24 C56,15 49,8 40,8 C31,8 24,15 24,24 C24,33 31,40 40,40"
-            stroke="#F5F0EF" strokeWidth="11" strokeLinecap="round" />
-          <path d="M40,40 C49,40 56,47 56,56 C56,65 49,72 40,72 C31,72 24,65 24,56"
-            stroke="#F5F0EF" strokeWidth="11" strokeLinecap="round" />
-        </svg>
-      </div>
-
-      {/* ── Page content ───────────────────────────────────────────────── */}
-      <div className="auth-page-wrap" style={{
-        position: 'relative', zIndex: 1,
+      {/* Scroll container */}
+      <div style={{
+        position: 'relative', zIndex: 10,
         minHeight: '100vh',
         display: 'flex',
         alignItems: 'center',
@@ -782,59 +687,98 @@ export default function AuthPage({ mode }) {
         boxSizing: 'border-box',
       }}>
 
-        {/* Card */}
+        {/* Glass card */}
         <div
-          className={`auth-card auth-anim${displayedMode === 'register' ? ' register-mode' : ''}`}
-          style={anim('0.05s', '0.7s')}
+          ref={cardRef}
+          className={activeTab === 'register' ? 'auth-card-register' : ''}
+          style={{
+            width: '440px',
+            maxWidth: 'calc(100vw - 2rem)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            background: 'rgba(26,21,23,0.55)',
+            border: '1px solid rgba(255,255,255,0.11)',
+            borderRadius: '20px',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.11)',
+            padding: '2.8rem 2.4rem',
+            boxSizing: 'border-box',
+            opacity: mounted ? 1 : 0,
+            transform: mounted ? 'translateY(0)' : 'translateY(20px)',
+            transition: 'opacity 500ms ease-out, transform 500ms ease-out',
+          }}
         >
-          <div className="auth-card-inner">
-
-            {/* ── Brand header ─────────────────────────────────────────── */}
-            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div className="auth-anim" style={{ display: 'inline-block', ...anim('0.2s', '0.5s') }}>
-                <LogoMark size={36} />
-              </div>
-              <p className="auth-anim" style={{
-                fontFamily: "'Cormorant Garamond', serif", fontWeight: 700,
-                fontSize: '1.25rem', color: '#F5F0EF',
-                letterSpacing: '0.05em', marginTop: '8px',
-                ...anim('0.28s', '0.5s'),
-              }}>
-                Sora Link
-              </p>
-            </div>
-
-            {/* ── Tab row ──────────────────────────────────────────────── */}
-            <div className="auth-anim" style={{
-              display: 'flex',
-              borderBottom: '1px solid rgba(255,255,255,0.07)',
-              marginBottom: '2rem',
-              ...anim('0.35s', '0.5s'),
+          {/* App name + accent bar */}
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <h1 style={{
+              fontFamily: "'Cormorant Garamond', serif",
+              fontWeight: 700, fontSize: '2.1rem',
+              color: '#F5F0EF', letterSpacing: '0.05em',
+              lineHeight: 1, marginBottom: '10px',
             }}>
-              <button
-                type="button"
-                className={`auth-tab-btn${isLogin ? ' active' : ''}`}
-                onClick={() => handleTabClick('/login')}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                className={`auth-tab-btn${!isLogin ? ' active' : ''}`}
-                onClick={() => handleTabClick('/register')}
-              >
-                Create Account
-              </button>
-            </div>
+              Sora Link
+            </h1>
+            <div style={{
+              width: '38px', height: '2px', margin: '0 auto',
+              background: 'linear-gradient(90deg, #8B1520, #C41E33)',
+              borderRadius: '1px',
+            }} />
+          </div>
 
-            {/* ── Form content (with tab-switch transition) ─────────────── */}
-            <div className={`auth-form-content${formVisible ? '' : ' hidden'}`}>
-              {displayedMode === 'login' ? <LoginForm /> : <RegisterForm />}
-            </div>
+          {/* Pill tab switcher with sliding indicator */}
+          <div style={{
+            display: 'flex',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: '10px',
+            overflow: 'hidden',
+            position: 'relative',
+            marginBottom: '2rem',
+          }}>
+            {/* Sliding fill */}
+            <div style={{
+              position: 'absolute',
+              top: 0, left: 0, bottom: 0,
+              width: '50%',
+              background: '#C41E33',
+              borderRadius: '9px',
+              boxShadow: '0 2px 14px rgba(196,30,51,0.4)',
+              transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: isLogin ? 'translateX(0)' : 'translateX(100%)',
+              pointerEvents: 'none',
+            }} />
+            {[
+              { tab: 'login',    label: 'Sign In'  },
+              { tab: 'register', label: 'Sign Up'  },
+            ].map(({ tab, label }) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => switchTab(tab)}
+                style={{
+                  flex: 1,
+                  position: 'relative', zIndex: 1,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: '0.8rem', fontWeight: 500,
+                  letterSpacing: '0.05em',
+                  color: activeTab === tab ? '#F5F0EF' : 'rgba(245,240,239,0.45)',
+                  padding: '0.65rem 0',
+                  transition: 'color 0.2s',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
+          {/* Form content with crossfade */}
+          <div className={`auth-form-wrap${formFading ? ' fading' : ''}`}>
+            {isLogin
+              ? <LoginForm    onShake={triggerShake} onSwitchTab={() => switchTab('register')} />
+              : <RegisterForm onShake={triggerShake} onSwitchTab={() => switchTab('login')}    />
+            }
           </div>
         </div>
-
       </div>
     </div>
   );
