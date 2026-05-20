@@ -60,6 +60,41 @@ const AUTH_CSS = `
   @keyframes orbPulseC { from { opacity: 0.55; } to { opacity: 0.9;  } }
   @keyframes orbPulseD { from { opacity: 0.7;  } to { opacity: 1.0;  } }
 
+  /* ── 8 unique glow keyframes — box-shadow off → peak → off + opacity boost ─ */
+  /* Each orb has its own so durations/delays freely differentiate them.         */
+  @keyframes orbGlow1 {
+    0%,100% { box-shadow: 0 0  60px 10px rgba(196,30,51,0.00); opacity: 0.7;  }
+    50%     { box-shadow: 0 0 120px 40px rgba(196,30,51,0.35); opacity: 1.0;  }
+  }
+  @keyframes orbGlow2 {
+    0%,100% { box-shadow: 0 0  60px 10px rgba(196,30,51,0.00); opacity: 0.7;  }
+    50%     { box-shadow: 0 0 115px 38px rgba(196,30,51,0.32); opacity: 0.98; }
+  }
+  @keyframes orbGlow3 {
+    0%,100% { box-shadow: 0 0  60px 10px rgba(196,30,51,0.00); opacity: 0.7;  }
+    50%     { box-shadow: 0 0 125px 42px rgba(196,30,51,0.38); opacity: 1.0;  }
+  }
+  @keyframes orbGlow4 {
+    0%,100% { box-shadow: 0 0  60px 10px rgba(196,30,51,0.00); opacity: 0.7;  }
+    50%     { box-shadow: 0 0 110px 36px rgba(196,30,51,0.30); opacity: 0.95; }
+  }
+  @keyframes orbGlow5 {
+    0%,100% { box-shadow: 0 0  60px 10px rgba(196,30,51,0.00); opacity: 0.7;  }
+    50%     { box-shadow: 0 0 120px 40px rgba(196,30,51,0.36); opacity: 1.0;  }
+  }
+  @keyframes orbGlow6 {
+    0%,100% { box-shadow: 0 0  60px 10px rgba(196,30,51,0.00); opacity: 0.7;  }
+    50%     { box-shadow: 0 0 118px 39px rgba(196,30,51,0.33); opacity: 0.97; }
+  }
+  @keyframes orbGlow7 {
+    0%,100% { box-shadow: 0 0  60px 10px rgba(196,30,51,0.00); opacity: 0.7;  }
+    50%     { box-shadow: 0 0 122px 41px rgba(196,30,51,0.37); opacity: 1.0;  }
+  }
+  @keyframes orbGlow8 {
+    0%,100% { box-shadow: 0 0  60px 10px rgba(196,30,51,0.00); opacity: 0.7;  }
+    50%     { box-shadow: 0 0 112px 37px rgba(196,30,51,0.31); opacity: 0.96; }
+  }
+
   /* Card shake on error */
   @keyframes cardShake {
     0%,100% { transform: translateX(0); }
@@ -195,21 +230,21 @@ const AUTH_CSS = `
 // Each orb: own movement keyframe + independent opacity pulse, animation-direction: alternate
 const ORBS = [
   // top-left corner
-  { w: 320, top:  '4%', left:  '-5%', blur: 80, move: 'orbMove1', movDur: '18s', movDelay:   '0s', pulse: 'orbPulseA', pulseDur: '24s', pulseDelay:  '-5s' },
+  { w: 320, top:  '4%', left:  '-5%', blur: 80, move: 'orbMove1', movDur: '18s', movDelay:   '0s', pulse: 'orbPulseA', pulseDur: '24s', pulseDelay:  '-5s', glow: 'orbGlow1', glowDur:  '6s', glowDelay:   '0s' },
   // top-right corner
-  { w: 240, top:  '2%', left:  '67%', blur: 70, move: 'orbMove2', movDur: '22s', movDelay:  '-4s', pulse: 'orbPulseB', pulseDur: '20s', pulseDelay:  '-8s' },
+  { w: 240, top:  '2%', left:  '67%', blur: 70, move: 'orbMove2', movDur: '22s', movDelay:  '-4s', pulse: 'orbPulseB', pulseDur: '20s', pulseDelay:  '-8s', glow: 'orbGlow2', glowDur:  '8s', glowDelay:   '3s' },
   // bottom-left corner
-  { w: 380, top: '75%', left:  '2%',  blur: 90, move: 'orbMove3', movDur: '28s', movDelay:  '-8s', pulse: 'orbPulseC', pulseDur: '30s', pulseDelay:  '-3s' },
+  { w: 380, top: '75%', left:  '2%',  blur: 90, move: 'orbMove3', movDur: '28s', movDelay:  '-8s', pulse: 'orbPulseC', pulseDur: '30s', pulseDelay:  '-3s', glow: 'orbGlow3', glowDur:  '5s', glowDelay:   '7s' },
   // bottom-right corner
-  { w: 180, top: '72%', left:  '71%', blur: 60, move: 'orbMove4', movDur: '14s', movDelay:  '-2s', pulse: 'orbPulseD', pulseDur: '18s', pulseDelay: '-12s' },
+  { w: 180, top: '72%', left:  '71%', blur: 60, move: 'orbMove4', movDur: '14s', movDelay:  '-2s', pulse: 'orbPulseD', pulseDur: '18s', pulseDelay: '-12s', glow: 'orbGlow4', glowDur:  '7s', glowDelay:  '11s' },
   // mid-left edge
-  { w: 280, top: '36%', left:  '-7%', blur: 75, move: 'orbMove5', movDur: '20s', movDelay: '-11s', pulse: 'orbPulseA', pulseDur: '26s', pulseDelay:  '-7s' },
+  { w: 280, top: '36%', left:  '-7%', blur: 75, move: 'orbMove5', movDur: '20s', movDelay: '-11s', pulse: 'orbPulseA', pulseDur: '26s', pulseDelay:  '-7s', glow: 'orbGlow5', glowDur:  '4s', glowDelay:   '5s' },
   // mid-right edge
-  { w: 220, top: '40%', left:  '75%', blur: 65, move: 'orbMove6', movDur: '16s', movDelay:  '-6s', pulse: 'orbPulseB', pulseDur: '22s', pulseDelay: '-15s' },
+  { w: 220, top: '40%', left:  '75%', blur: 65, move: 'orbMove6', movDur: '16s', movDelay:  '-6s', pulse: 'orbPulseB', pulseDur: '22s', pulseDelay: '-15s', glow: 'orbGlow6', glowDur: '6.5s', glowDelay: '13s' },
   // top-center
-  { w: 350, top:  '-5%', left: '28%', blur: 85, move: 'orbMove7', movDur: '24s', movDelay: '-15s', pulse: 'orbPulseC', pulseDur: '28s', pulseDelay:  '-2s' },
+  { w: 350, top:  '-5%', left: '28%', blur: 85, move: 'orbMove7', movDur: '24s', movDelay: '-15s', pulse: 'orbPulseC', pulseDur: '28s', pulseDelay:  '-2s', glow: 'orbGlow7', glowDur: '5.5s', glowDelay:  '9s' },
   // bottom-center
-  { w: 200, top: '80%', left:  '36%', blur: 70, move: 'orbMove8', movDur: '12s', movDelay:  '-3s', pulse: 'orbPulseD', pulseDur: '19s', pulseDelay:  '-9s' },
+  { w: 200, top: '80%', left:  '36%', blur: 70, move: 'orbMove8', movDur: '12s', movDelay:  '-3s', pulse: 'orbPulseD', pulseDur: '19s', pulseDelay:  '-9s', glow: 'orbGlow8', glowDur: '7.5s', glowDelay: '15s' },
 ];
 
 /* ─── Shared label style ─────────────────────────────────────────────────────── */
@@ -307,12 +342,13 @@ function BackgroundScene() {
               borderRadius: '50%',
               background: 'radial-gradient(circle at center, rgba(196,30,51,0.18) 0%, rgba(139,21,32,0.08) 50%, transparent 70%)',
               filter: `blur(${orb.blur}px)`,
-              // Two independent animations: movement + opacity pulse, both alternate
+              // Three independent animations: drift (alternate) + opacity pulse (alternate) + glow (forward)
               animation: [
                 `${orb.move}  ${orb.movDur}   ease-in-out infinite alternate`,
                 `${orb.pulse} ${orb.pulseDur} ease-in-out infinite alternate`,
+                `${orb.glow}  ${orb.glowDur}  ease-in-out infinite`,
               ].join(', '),
-              animationDelay: `${orb.movDelay}, ${orb.pulseDelay}`,
+              animationDelay: `${orb.movDelay}, ${orb.pulseDelay}, ${orb.glowDelay}`,
               willChange: 'transform',
             }}
           />
