@@ -15,9 +15,26 @@ import socket from '../../socket';
 
 const TOPBAR_CSS = `
   .tbar-search::placeholder { color: rgba(245,240,239,0.28); }
-  .tbar-search:focus { border-color: rgba(139,21,32,0.5) !important; background: rgba(255,255,255,0.07) !important; outline: none; }
-  .tbar-icon-btn:hover { background: rgba(255,255,255,0.1) !important; }
-  @keyframes shake {
+  .tbar-search:focus {
+    border-color: rgba(139,21,32,0.5) !important;
+    background: rgba(255,255,255,0.07) !important;
+    outline: none;
+  }
+  @keyframes skeletonShimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position:  400px 0; }
+  }
+  .skeleton-pulse {
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0.06) 25%,
+      rgba(255,255,255,0.10) 50%,
+      rgba(255,255,255,0.06) 75%
+    );
+    background-size: 400px 100%;
+    animation: skeletonShimmer 1.6s ease-in-out infinite;
+  }
+  @keyframes bellShake {
     0%   { transform: rotate(0deg); }
     20%  { transform: rotate(-12deg); }
     40%  { transform: rotate(12deg); }
@@ -120,19 +137,29 @@ export default function Topbar() {
     navigate('/login');
   };
 
+  const iconBtnStyle = {
+    background: 'rgba(255,255,255,0.06)',
+    border: 'none',
+    cursor: 'pointer',
+    color: 'rgba(245,240,239,0.7)',
+    borderRadius: '50%',
+    transition: 'background 0.15s',
+  };
+
   return (
     <>
       <style>{TOPBAR_CSS}</style>
 
       <header
-        className="px-4 flex items-center"
-        style={{ background: '#100D0E', height: '52px' }}
+        className="px-4 flex items-center h-full"
+        style={{ background: 'transparent' }}
       >
         {/* LEFT — logo */}
-        <div className="shrink-0 flex items-center gap-2" style={{ width: '200px' }}>
+        <div className="shrink-0 flex items-center" style={{ width: '200px' }}>
           <Link to="/" className="flex items-center gap-2 select-none">
             <LogoMark />
             <span
+              className="hidden sm:block"
               style={{
                 fontFamily: "'Cormorant Garamond', serif",
                 fontWeight: 700,
@@ -175,10 +202,12 @@ export default function Topbar() {
             <div
               className="absolute left-0 right-0 top-full mt-1 z-50 overflow-hidden"
               style={{
-                background: '#1E181A',
+                background: 'rgba(23,18,20,0.96)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
                 border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '8px',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                borderRadius: '10px',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
               }}
             >
               {searchResults.map((u) => (
@@ -214,8 +243,8 @@ export default function Topbar() {
           <button
             type="button"
             onClick={() => setDrawerOpen((o) => !o)}
-            className={`tbar-icon-btn relative w-[30px] h-[30px] flex items-center justify-center rounded-full transition-colors ${bellWobble ? 'animate-[shake_0.3s_ease-in-out]' : ''}`}
-            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(245,240,239,0.7)' }}
+            className={`relative w-[30px] h-[30px] flex items-center justify-center transition-colors hover:bg-white/10 ${bellWobble ? 'animate-[bellShake_0.3s_ease-in-out]' : ''}`}
+            style={iconBtnStyle}
             aria-label="Notifications"
           >
             <Bell size={15} />
@@ -231,8 +260,8 @@ export default function Topbar() {
           <button
             type="button"
             onClick={() => navigate('/chats')}
-            className="tbar-icon-btn w-[30px] h-[30px] flex items-center justify-center rounded-full transition-colors"
-            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(245,240,239,0.7)' }}
+            className="w-[30px] h-[30px] flex items-center justify-center transition-colors hover:bg-white/10"
+            style={iconBtnStyle}
             aria-label="Messages"
           >
             <MessageCircle size={15} />
@@ -242,18 +271,14 @@ export default function Topbar() {
           <button
             type="button"
             onClick={() => navigate('/games')}
-            className="tbar-icon-btn w-[30px] h-[30px] flex items-center justify-center rounded-full transition-colors"
-            style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(245,240,239,0.7)' }}
+            className="w-[30px] h-[30px] flex items-center justify-center transition-colors hover:bg-white/10"
+            style={iconBtnStyle}
             aria-label="Games"
           >
             <Gamepad2 size={15} />
           </button>
 
-          {/* Divider */}
-          <span
-            className="w-px h-5 mx-0.5"
-            style={{ background: 'rgba(255,255,255,0.1)' }}
-          />
+          <span className="w-px h-5 mx-0.5" style={{ background: 'rgba(255,255,255,0.1)' }} />
 
           {/* Profile dropdown */}
           <Dropdown
@@ -262,6 +287,7 @@ export default function Topbar() {
               <button
                 type="button"
                 className="flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors cursor-pointer hover:bg-white/5"
+                style={{ background: 'none', border: 'none' }}
               >
                 <Avatar
                   firstName={user?.first_name}
@@ -273,7 +299,11 @@ export default function Topbar() {
               </button>
             }
           >
-            <div className="flex items-center gap-3 py-3 px-4 border-b border-[#E0E0E0]">
+            {/* Dropdown header — dark themed */}
+            <div
+              className="flex items-center gap-3 py-3 px-4"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+            >
               <Avatar
                 firstName={user?.first_name}
                 lastName={user?.last_name}
@@ -281,10 +311,12 @@ export default function Topbar() {
                 size="md"
               />
               <div className="min-w-0">
-                <p className="font-semibold text-sm text-[#0A0A0A] truncate">
+                <p style={{ fontWeight: 600, fontSize: '0.875rem', color: '#F5F0EF' }} className="truncate">
                   {user?.first_name} {user?.last_name}
                 </p>
-                <p className="text-xs text-[#888888] truncate">@{user?.username}</p>
+                <p style={{ fontSize: '0.75rem', color: 'rgba(245,240,239,0.4)' }} className="truncate">
+                  @{user?.username}
+                </p>
               </div>
             </div>
 
@@ -304,17 +336,20 @@ export default function Topbar() {
       {/* Notification drawer backdrop */}
       {drawerOpen && (
         <div className="fixed inset-0 z-40" onClick={() => setDrawerOpen(false)}>
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)' }} />
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }} />
         </div>
       )}
 
       {/* Notification drawer */}
       <div
-        className={`fixed right-0 top-0 bottom-0 z-50 w-[360px] flex flex-col transition-transform duration-300 ease-in-out ${drawerOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed right-0 top-0 bottom-0 z-50 flex flex-col transition-transform duration-300 ease-in-out ${drawerOpen ? 'translate-x-0' : 'translate-x-full'}`}
         style={{
-          background: '#171214',
-          borderLeft: '1px solid rgba(255,255,255,0.07)',
-          boxShadow: '-8px 0 40px rgba(0,0,0,0.6)',
+          width: 'min(360px, 100vw)',
+          background: 'rgba(14,10,12,0.92)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderLeft: '1px solid rgba(255,255,255,0.09)',
+          boxShadow: '-12px 0 48px rgba(0,0,0,0.7)',
         }}
       >
         {/* Drawer header */}
@@ -329,8 +364,8 @@ export default function Topbar() {
             <button
               type="button"
               onClick={handleMarkAll}
-              style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.75rem', background: 'none', border: 'none', cursor: 'pointer' }}
               className="px-2 py-1 rounded transition-colors hover:text-white/70"
+              style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.75rem', background: 'none', border: 'none', cursor: 'pointer' }}
             >
               Mark all read
             </button>
@@ -338,7 +373,7 @@ export default function Topbar() {
               type="button"
               onClick={() => setDrawerOpen(false)}
               className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-white/5"
-              style={{ color: 'rgba(245,240,239,0.45)' }}
+              style={{ color: 'rgba(245,240,239,0.45)', background: 'none', border: 'none', cursor: 'pointer' }}
             >
               <X size={15} />
             </button>
@@ -348,12 +383,23 @@ export default function Topbar() {
         {/* Drawer body */}
         <div className="flex-1 overflow-y-auto">
           {notifsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <span style={{ color: 'rgba(245,240,239,0.35)', fontSize: '0.85rem' }}>Loading…</span>
+            <div className="p-4 space-y-3">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-3 px-1 py-2">
+                  <div
+                    className="shrink-0 w-9 h-9 rounded-full skeleton-pulse"
+                    style={{ background: 'rgba(255,255,255,0.07)' }}
+                  />
+                  <div className="flex-1 space-y-2">
+                    <div className="skeleton-pulse h-3 w-4/5 rounded" style={{ background: 'rgba(255,255,255,0.07)' }} />
+                    <div className="skeleton-pulse h-2.5 w-1/2 rounded" style={{ background: 'rgba(255,255,255,0.05)' }} />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : notifs.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <span style={{ color: 'rgba(245,240,239,0.35)', fontSize: '0.85rem' }}>
+            <div className="flex items-center justify-center py-16">
+              <span style={{ color: 'rgba(245,240,239,0.3)', fontSize: '0.85rem' }}>
                 No notifications yet.
               </span>
             </div>
@@ -383,8 +429,8 @@ export default function Topbar() {
           <Link
             to="/notifications"
             onClick={() => setDrawerOpen(false)}
+            className="transition-colors hover:text-white/70"
             style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.84rem' }}
-            className="hover:text-white/70 transition-colors"
           >
             View all notifications
           </Link>

@@ -32,7 +32,9 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"glassmorphism dark social app\" --domain style)",
+      "Bash(python .claude/skills/ui-ux-pro-max/scripts/search.py \"social network react performance\" --stack react)"
     ]
   }
 }

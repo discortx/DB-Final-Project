@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  Home, User, Users, MessageCircle,
-  Gamepad2,
+  Home, User, Users, MessageCircle, Gamepad2,
 } from 'lucide-react';
 import Avatar from '../ui/Avatar';
 import useAuthStore from '../../store/authStore';
@@ -11,13 +10,12 @@ import socket from '../../socket';
 
 const SIDEBAR_CSS = `
   .sl-nav-link { transition: all 0.15s ease; text-decoration: none; }
-  .sl-nav-link:hover { background: rgba(255,255,255,0.05) !important; }
+  .sl-nav-link:hover { background: rgba(255,255,255,0.06) !important; }
   .sl-nav-link.active:hover { background: rgba(139,21,32,0.22) !important; }
 `;
 
 export default function LeftSidebar() {
   const user = useAuthStore((s) => s.user);
-
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
@@ -31,32 +29,30 @@ export default function LeftSidebar() {
 
   useEffect(() => {
     function handle(notif) {
-      if (notif?.type === 'FRIEND_REQUEST') {
-        setPendingCount((c) => c + 1);
-      }
+      if (notif?.type === 'FRIEND_REQUEST') setPendingCount((c) => c + 1);
     }
     socket.on('notification:new', handle);
     return () => socket.off('notification:new', handle);
   }, []);
 
   const navItems = [
-    { icon: Home,          label: 'Home',     to: '/',                  end: true,  badge: null         },
-    { icon: User,          label: 'Profile',  to: `/profile/${user?.id}`, end: false, badge: null       },
-    { icon: Users,         label: 'Friends',  to: '/friends',           end: false, badge: pendingCount },
-    { icon: MessageCircle, label: 'Messages', to: '/chats',             end: false, badge: null         },
-    { icon: Gamepad2,      label: 'Games',    to: '/games',             end: false, badge: null         },
+    { icon: Home,          label: 'Home',     to: '/',                    end: true,  badge: null                           },
+    { icon: User,          label: 'Profile',  to: `/profile/${user?.id}`, end: false, badge: null                           },
+    { icon: Users,         label: 'Friends',  to: '/friends',             end: false, badge: pendingCount > 99 ? '99+' : pendingCount || null },
+    { icon: MessageCircle, label: 'Messages', to: '/chats',               end: false, badge: null                           },
+    { icon: Gamepad2,      label: 'Games',    to: '/games',               end: false, badge: null                           },
   ];
 
   return (
     <>
       <style>{SIDEBAR_CSS}</style>
       <aside
-        style={{ background: '#100D0E' }}
         className="pt-4 px-2 pb-4 flex flex-col w-full h-full"
+        style={{ background: 'transparent' }}
       >
         <p
-          style={{ color: 'rgba(245,240,239,0.28)', fontSize: '0.6rem', letterSpacing: '0.14em', fontWeight: 700 }}
           className="px-3 mb-2 uppercase"
+          style={{ color: 'rgba(245,240,239,0.25)', fontSize: '0.6rem', letterSpacing: '0.14em', fontWeight: 700 }}
         >
           Menu
         </p>
@@ -76,11 +72,12 @@ export default function LeftSidebar() {
                 borderLeft: `3px solid ${isActive ? '#C41E33' : 'transparent'}`,
                 borderRadius: isActive ? '0 6px 6px 0' : '6px',
                 fontWeight: isActive ? 600 : 400,
+                boxShadow: isActive ? 'inset 0 0 0 1px rgba(196,30,51,0.15)' : 'none',
               })}
             >
               <Icon size={17} className="shrink-0" />
               <span className="flex-1 truncate">{label}</span>
-              {badge != null && badge > 0 && (
+              {badge != null && badge !== 0 && badge !== false && (
                 <span
                   style={{
                     background: '#8B1520',
@@ -99,11 +96,15 @@ export default function LeftSidebar() {
           ))}
         </nav>
 
-        {/* User info pinned at bottom */}
+        {/* User info pinned at bottom — glass micro-card */}
         {user && (
           <div
-            className="pt-3 mt-3 px-2"
-            style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
+            className="mt-3 px-3 py-2.5"
+            style={{
+              borderRadius: '8px',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.07)',
+            }}
           >
             <div className="flex items-center gap-2">
               <div className="relative shrink-0">
@@ -115,19 +116,19 @@ export default function LeftSidebar() {
                 />
                 <span
                   className="absolute bottom-0 right-0 w-2 h-2 rounded-full"
-                  style={{ background: '#1A7A4A', border: '2px solid #100D0E' }}
+                  style={{ background: '#1A7A4A', border: '2px solid transparent' }}
                 />
               </div>
               <div className="min-w-0">
                 <p
-                  style={{ color: '#F5F0EF', fontSize: '0.78rem', fontWeight: 500 }}
                   className="truncate"
+                  style={{ color: '#F5F0EF', fontSize: '0.78rem', fontWeight: 500 }}
                 >
                   {user.first_name} {user.last_name}
                 </p>
                 <p
-                  style={{ color: 'rgba(245,240,239,0.38)', fontSize: '0.7rem' }}
                   className="truncate"
+                  style={{ color: 'rgba(245,240,239,0.38)', fontSize: '0.7rem' }}
                 >
                   @{user.username}
                 </p>

@@ -10,48 +10,53 @@ export default function Modal({
   maxWidth = 'max-w-md',
 }) {
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    document.body.style.overflow = open ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
   }, [open]);
 
   if (!open) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
       onClick={onClose}
     >
       <div
-        className={`bg-white border border-[#E0E0E0] rounded-lg w-full ${maxWidth} p-6 shadow-xl`}
+        className={`w-full ${maxWidth}`}
+        style={{
+          background: 'rgba(23,18,20,0.92)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '12px',
+          padding: '24px',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex justify-between items-center mb-4">
           {title && (
-            <h2 className="text-xl font-semibold text-[#0A0A0A]">{title}</h2>
+            <h2 style={{ color: '#F5F0EF', fontSize: '1rem', fontWeight: 600 }}>{title}</h2>
           )}
           <button
             type="button"
             onClick={onClose}
-            className="ml-auto bg-transparent text-[#0A0A0A] rounded-md p-1 hover:bg-[#EFEFEF] transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-black"
+            className="ml-auto flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-white/8 cursor-pointer"
+            style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(245,240,239,0.55)' }}
             aria-label="Close"
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Body */}
         <div>{children}</div>
 
-        {/* Footer */}
         {footer && (
-          <div className="mt-4 flex justify-end gap-2 border-t border-[#E0E0E0] pt-4">
+          <div
+            className="mt-4 flex justify-end gap-2 pt-4"
+            style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
+          >
             {footer}
           </div>
         )}
