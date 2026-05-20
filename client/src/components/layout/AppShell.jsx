@@ -8,6 +8,7 @@ import OrbBackground from '../ui/OrbBackground';
 import useAuthStore from '../../store/authStore';
 import useNotifStore from '../../store/notifStore';
 import socket from '../../socket';
+import { getNotifications } from '../../api/notifications';
 
 const BOTTOM_TABS = [
   { icon: Home,          label: 'Home',         to: '/',              exact: true  },
@@ -17,11 +18,12 @@ const BOTTOM_TABS = [
 ];
 
 export default function AppShell() {
-  const user        = useAuthStore((s) => s.user);
-  const token       = useAuthStore((s) => s.token);
-  const unreadCount = useNotifStore((s) => s.unreadCount);
-  const location    = useLocation();
-  const isMessages  = location.pathname.startsWith('/chats');
+  const user           = useAuthStore((s) => s.user);
+  const token          = useAuthStore((s) => s.token);
+  const unreadCount    = useNotifStore((s) => s.unreadCount);
+  const setUnreadCount = useNotifStore((s) => s.setUnreadCount);
+  const location       = useLocation();
+  const isMessages     = location.pathname.startsWith('/chats');
 
   useEffect(() => {
     if (!token) return;
@@ -31,6 +33,15 @@ export default function AppShell() {
     }
     return () => { socket.disconnect(); };
   }, [token]);
+
+  // Initialize unread badge count from server on mount
+  useEffect(() => {
+    if (!token) return;
+    getNotifications().then((res) => {
+      const count = parseInt(res.headers?.['x-unread-count'] ?? '', 10);
+      if (!Number.isNaN(count)) setUnreadCount(count);
+    }).catch(() => {});
+  }, [token, setUnreadCount]);
 
   function isActive(to, exact) {
     if (exact) return location.pathname === to;

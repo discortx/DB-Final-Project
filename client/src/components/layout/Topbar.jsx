@@ -98,26 +98,36 @@ export default function Topbar() {
   const [drawerOpen,    setDrawerOpen]    = useState(false);
   const [notifs,        setNotifs]        = useState([]);
   const [notifsLoading, setNotifsLoading] = useState(false);
+  const [notifsError,   setNotifsError]   = useState(false);
   const [bellWobble,    setBellWobble]    = useState(false);
 
   const loadNotifs = useCallback(async () => {
     setNotifsLoading(true);
+    setNotifsError(false);
     try {
       const res = await getNotifications();
-      setNotifs((res.data || []).slice(0, 20));
-    } catch {}
+      const items = Array.isArray(res.data) ? res.data : [];
+      setNotifs(items.slice(0, 20));
+      const serverCount = parseInt(res.headers?.['x-unread-count'] ?? '', 10);
+      if (!Number.isNaN(serverCount)) setUnreadCount(serverCount);
+    } catch {
+      setNotifsError(true);
+    }
     setNotifsLoading(false);
-  }, []);
+  }, [setUnreadCount]);
 
   useEffect(() => {
     if (drawerOpen) loadNotifs();
   }, [drawerOpen, loadNotifs]);
 
   useEffect(() => {
-    function handleNew() {
+    function handleNew(notif) {
       increment();
       setBellWobble(true);
       setTimeout(() => setBellWobble(false), 400);
+      if (notif && typeof notif === 'object') {
+        setNotifs((prev) => [notif, ...prev].slice(0, 20));
+      }
     }
     socket.on('notification:new', handleNew);
     return () => socket.off('notification:new', handleNew);
@@ -397,9 +407,26 @@ export default function Topbar() {
                 </div>
               ))}
             </div>
+          ) : notifsError ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <span style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.85rem' }}>
+                Could not load notifications.
+              </span>
+              <button
+                type="button"
+                onClick={loadNotifs}
+                style={{
+                  background: 'none', border: '1px solid rgba(255,255,255,0.12)',
+                  color: 'rgba(245,240,239,0.6)', borderRadius: '8px',
+                  padding: '4px 14px', fontSize: '0.78rem', cursor: 'pointer',
+                }}
+              >
+                Retry
+              </button>
+            </div>
           ) : notifs.length === 0 ? (
             <div className="flex items-center justify-center py-16">
-              <span style={{ color: 'rgba(245,240,239,0.3)', fontSize: '0.85rem' }}>
+              <span style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.85rem' }}>
                 No notifications yet.
               </span>
             </div>
