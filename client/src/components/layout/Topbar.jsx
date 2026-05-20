@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Search, Bell, MessageCircle, Gamepad2,
+  Search, Bell,
   ChevronDown, User, LogOut, X,
 } from 'lucide-react';
 import Avatar from '../ui/Avatar';
@@ -265,28 +265,6 @@ export default function Topbar() {
                 style={{ background: '#8B1520' }}
               />
             )}
-          </button>
-
-          {/* Messages */}
-          <button
-            type="button"
-            onClick={() => navigate('/chats')}
-            className="w-[30px] h-[30px] flex items-center justify-center transition-colors hover:bg-white/10"
-            style={iconBtnStyle}
-            aria-label="Messages"
-          >
-            <MessageCircle size={15} />
-          </button>
-
-          {/* Games */}
-          <button
-            type="button"
-            onClick={() => navigate('/games')}
-            className="w-[30px] h-[30px] flex items-center justify-center transition-colors hover:bg-white/10"
-            style={iconBtnStyle}
-            aria-label="Games"
-          >
-            <Gamepad2 size={15} />
           </button>
 
           <span className="w-px h-5 mx-0.5" style={{ background: 'rgba(255,255,255,0.1)' }} />
