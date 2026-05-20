@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { register, login } from '../api/auth';
@@ -6,8 +6,15 @@ import useAuthStore from '../store/authStore';
 import useToastStore from '../store/toastStore';
 import socket from '../socket';
 
-/* ─── CSS injected once — handles interactive states that need pseudo-classes ─── */
+/* ─── CSS injected once ──────────────────────────────────────────────────────── */
 const AUTH_CSS = `
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0);    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .auth-anim { animation: none !important; opacity: 1 !important; transform: none !important; }
+  }
   .auth-input {
     transition: border-color 0.2s ease, background 0.2s ease;
     box-sizing: border-box;
@@ -21,16 +28,18 @@ const AUTH_CSS = `
   .auth-submit {
     background-color: #8B1520;
     background-image: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%);
-    transition: background-color 0.15s ease, transform 0.1s ease;
+    transition: background-color 0.2s ease, transform 0.1s ease;
   }
   .auth-submit:hover:not(:disabled) { background-color: #A8192B; }
   .auth-submit:active:not(:disabled) { background-color: #720F1A; transform: scale(0.99); }
   .auth-submit:disabled { opacity: 0.45; cursor: not-allowed; }
   .auth-link:hover { opacity: 0.75; }
   .auth-gender-btn:hover { border-color: rgba(139,21,32,0.6) !important; }
+  .auth-tab-link { transition: color 0.15s; }
+  .auth-tab-link:hover { color: rgba(245,240,239,0.75) !important; }
 `;
 
-/* ─── Palette ──────────────────────────────────────────────────────────────── */
+/* ─── Palette ────────────────────────────────────────────────────────────────── */
 const C = {
   bg:      '#080607',
   left:    '#100D0E',
@@ -38,11 +47,20 @@ const C = {
   crimsonH:'#C41E33',
   white:   '#F5F0EF',
   muted:   'rgba(245,240,239,0.45)',
+  hint:    'rgba(245,240,239,0.22)',
   inputBg: 'rgba(255,255,255,0.04)',
   border:  'rgba(255,255,255,0.07)',
 };
 
-/* ─── Reused style objects ─────────────────────────────────────────────────── */
+/* ─── Animation helper ───────────────────────────────────────────────────────── */
+// Returns inline style object for staggered fadeUp page-load animation.
+// Elements start invisible and slide up on mount.
+const anim = (delay, duration = '0.6s') => ({
+  opacity: 0,
+  animation: `fadeUp ${duration} cubic-bezier(0.16,1,0.3,1) ${delay} both`,
+});
+
+/* ─── Reused style objects ───────────────────────────────────────────────────── */
 const labelStyle = {
   display: 'block',
   fontSize: '0.7rem',
@@ -68,7 +86,7 @@ const inputBase = {
   display: 'block',
 };
 
-/* ─── Preserved helpers (logic unchanged) ─────────────────────────────────── */
+/* ─── Preserved helpers (logic unchanged) ────────────────────────────────────── */
 function calcPasswordStrength(pw) {
   let score = 0;
   if (pw.length >= 8) score++;
@@ -108,18 +126,22 @@ function validateUsername(val) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/* ─── Small UI atoms ───────────────────────────────────────────────────────── */
+/* ─── Small UI atoms ─────────────────────────────────────────────────────────── */
 function FieldError({ msg }) {
   if (!msg) return null;
   return (
-    <p style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px', fontSize: '0.72rem', color: '#E05555', fontFamily: "'DM Sans', sans-serif" }}>
+    <p style={{
+      display: 'flex', alignItems: 'center', gap: '5px',
+      marginTop: '6px', fontSize: '0.72rem', color: C.crimsonH,
+      fontFamily: "'DM Sans', sans-serif",
+      opacity: msg ? 1 : 0, transition: 'opacity 0.15s',
+    }}>
       <AlertCircle size={11} />
       {msg}
     </p>
   );
 }
 
-/* Eye icon SVGs — avoids lucide Eye/EyeOff which ship with stroke="currentColor" */
 const EyeOpen = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -134,7 +156,6 @@ const EyeClosed = () => (
   </svg>
 );
 
-/* Logo mark — two curved strokes forming an S */
 function LogoMark({ size = 38 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 80 80" fill="none">
@@ -150,7 +171,6 @@ function LogoMark({ size = 38 }) {
   );
 }
 
-/* Submit button — shared between login and register */
 function SubmitBtn({ loading, disabled, children }) {
   return (
     <button
@@ -182,7 +202,7 @@ function SubmitBtn({ loading, disabled, children }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   LOGIN FORM — logic preserved verbatim, only JSX/CSS changed
+   LOGIN FORM — logic preserved verbatim, visual layer updated
 ═══════════════════════════════════════════════════════════════ */
 function LoginForm() {
   const navigate = useNavigate();
@@ -233,17 +253,33 @@ function LoginForm() {
   return (
     <div>
       {/* Heading */}
-      <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, fontSize: '2.2rem', color: C.white, marginBottom: '6px', lineHeight: 1.1 }}>
+      <h1
+        className="auth-anim"
+        style={{
+          fontFamily: "'Cormorant Garamond', serif", fontWeight: 700,
+          fontSize: '2.2rem', color: C.white, marginBottom: '6px', lineHeight: 1.1,
+          ...anim('0.25s', '0.6s'),
+        }}
+      >
         Welcome back.
       </h1>
-      <p style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: '0.82rem', color: C.muted, marginBottom: '2rem' }}>
+
+      {/* Subheading */}
+      <p
+        className="auth-anim"
+        style={{
+          fontFamily: "'DM Sans', sans-serif", fontWeight: 300,
+          fontSize: '0.82rem', color: C.muted, marginBottom: '2rem',
+          ...anim('0.3s', '0.5s'),
+        }}
+      >
         Enter your credentials to continue.
       </p>
 
       <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
 
         {/* Email */}
-        <div>
+        <div className="auth-anim" style={anim('0.35s', '0.5s')}>
           <label style={labelStyle}>Email</label>
           <input
             type="email"
@@ -254,13 +290,13 @@ function LoginForm() {
             autoComplete="email"
             autoFocus
             placeholder="you@example.com"
-            style={{ ...inputBase, borderColor: emailError ? '#8B1520' : C.border, caretColor: C.crimsonH }}
+            style={{ ...inputBase, borderColor: emailError ? C.crimson : C.border, caretColor: C.crimsonH }}
           />
           <FieldError msg={emailError} />
         </div>
 
         {/* Password */}
-        <div>
+        <div className="auth-anim" style={anim('0.42s', '0.5s')}>
           <label style={labelStyle}>Password</label>
           <div style={{ position: 'relative' }}>
             <input
@@ -271,10 +307,15 @@ function LoginForm() {
               onBlur={() => setTouched((t) => ({ ...t, password: true }))}
               autoComplete="current-password"
               placeholder="••••••••"
-              style={{ ...inputBase, paddingRight: '44px', borderColor: passwordError ? '#8B1520' : C.border, caretColor: C.crimsonH }}
+              style={{ ...inputBase, paddingRight: '44px', borderColor: passwordError ? C.crimson : C.border, caretColor: C.crimsonH }}
             />
-            <button type="button" tabIndex={-1} onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'} style={eyeStyle}>
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              style={eyeStyle}
+            >
               {showPassword ? <EyeOpen /> : <EyeClosed />}
             </button>
           </div>
@@ -282,28 +323,46 @@ function LoginForm() {
         </div>
 
         {/* Forgot password */}
-        <div style={{ textAlign: 'right', marginTop: '-4px' }}>
-          <a href="#" className="auth-link"
-            style={{ fontSize: '0.75rem', color: C.crimsonH, fontFamily: "'DM Sans', sans-serif", textDecoration: 'none' }}>
+        <div className="auth-anim" style={{ textAlign: 'right', marginTop: '-4px', ...anim('0.49s', '0.5s') }}>
+          <a
+            href="#"
+            className="auth-link"
+            style={{ fontSize: '0.75rem', color: C.crimsonH, fontFamily: "'DM Sans', sans-serif", textDecoration: 'none' }}
+          >
             Forgot password?
           </a>
         </div>
 
         {/* Server error */}
         {error && (
-          <div style={{ background: 'rgba(139,21,32,0.12)', border: `1px solid ${C.crimson}`, borderRadius: '4px', padding: '10px 12px', fontSize: '0.8rem', color: '#E05555', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'DM Sans', sans-serif" }}>
+          <div style={{
+            background: 'rgba(139,21,32,0.12)', border: `1px solid ${C.crimson}`,
+            borderRadius: '4px', padding: '10px 12px', fontSize: '0.8rem',
+            color: '#E05555', display: 'flex', alignItems: 'center', gap: '8px',
+            fontFamily: "'DM Sans', sans-serif",
+          }}>
             <AlertCircle size={14} className="shrink-0" />
             {error}
           </div>
         )}
 
-        <SubmitBtn loading={loading} disabled={!canSubmit}>
-          {loading ? 'Signing in…' : 'Sign in'}
-        </SubmitBtn>
+        {/* Submit */}
+        <div className="auth-anim" style={anim('0.55s', '0.5s')}>
+          <SubmitBtn loading={loading} disabled={!canSubmit}>
+            {loading ? 'Signing in…' : 'Sign in'}
+          </SubmitBtn>
+        </div>
 
       </form>
 
-      <p style={{ textAlign: 'center', marginTop: '1.6rem', fontSize: '0.78rem', color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>
+      <p
+        className="auth-anim"
+        style={{
+          textAlign: 'center', marginTop: '1.6rem', fontSize: '0.78rem',
+          color: C.muted, fontFamily: "'DM Sans', sans-serif",
+          ...anim('0.62s', '0.5s'),
+        }}
+      >
         New to Sora Link?{' '}
         <Link to="/register" className="auth-link" style={{ color: C.crimsonH, textDecoration: 'none' }}>
           Create an account
@@ -314,7 +373,7 @@ function LoginForm() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   REGISTER FORM — logic preserved verbatim, only JSX/CSS changed
+   REGISTER FORM — logic preserved verbatim, visual layer updated
 ═══════════════════════════════════════════════════════════════ */
 function RegisterForm() {
   const navigate = useNavigate();
@@ -387,30 +446,47 @@ function RegisterForm() {
   };
 
   const genderOptions = [
-    { label: 'Male',             value: 'MALE'   },
-    { label: 'Female',           value: 'FEMALE' },
-    { label: 'Prefer not to say', value: null    },
+    { label: 'Male',              value: 'MALE'   },
+    { label: 'Female',            value: 'FEMALE' },
+    { label: 'Prefer not to say', value: null     },
   ];
 
   return (
     <div>
-      <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, fontSize: '2.2rem', color: C.white, marginBottom: '6px', lineHeight: 1.1 }}>
+      <h1
+        className="auth-anim"
+        style={{
+          fontFamily: "'Cormorant Garamond', serif", fontWeight: 700,
+          fontSize: '2.2rem', color: C.white, marginBottom: '6px', lineHeight: 1.1,
+          ...anim('0.25s', '0.6s'),
+        }}
+      >
         Create your account.
       </h1>
-      <p style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 300, fontSize: '0.82rem', color: C.muted, marginBottom: '1.6rem' }}>
+      <p
+        className="auth-anim"
+        style={{
+          fontFamily: "'DM Sans', sans-serif", fontWeight: 300,
+          fontSize: '0.82rem', color: C.muted, marginBottom: '1.6rem',
+          ...anim('0.3s', '0.5s'),
+        }}
+      >
         Fill in your details to get started.
       </p>
 
       <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
 
         {/* First + Last name */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        <div
+          className="auth-anim"
+          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', ...anim('0.35s', '0.5s') }}
+        >
           <div>
             <label style={labelStyle}>First Name</label>
             <input type="text" className="auth-input"
               value={firstName} onChange={(e) => setFirstName(e.target.value)} onBlur={() => touch('firstName')}
               placeholder="Jane"
-              style={{ ...inputBase, borderColor: firstNameError ? '#8B1520' : C.border }}
+              style={{ ...inputBase, borderColor: firstNameError ? C.crimson : C.border }}
             />
             <FieldError msg={firstNameError} />
           </div>
@@ -419,17 +495,17 @@ function RegisterForm() {
             <input type="text" className="auth-input"
               value={lastName} onChange={(e) => setLastName(e.target.value)} onBlur={() => touch('lastName')}
               placeholder="Smith"
-              style={{ ...inputBase, borderColor: lastNameError ? '#8B1520' : C.border }}
+              style={{ ...inputBase, borderColor: lastNameError ? C.crimson : C.border }}
             />
             <FieldError msg={lastNameError} />
           </div>
         </div>
 
         {/* Username */}
-        <div>
+        <div className="auth-anim" style={anim('0.42s', '0.5s')}>
           <label style={labelStyle}>
             Username{' '}
-            <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 300 }}>(8–12 chars)</span>
+            <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 300 }}>(8–12 chars, no spaces)</span>
           </label>
           <div style={{ position: 'relative' }}>
             <input type="text" className="auth-input"
@@ -439,7 +515,7 @@ function RegisterForm() {
                 ...inputBase,
                 paddingRight: '36px',
                 borderColor: usernameError
-                  ? '#8B1520'
+                  ? C.crimson
                   : username.length > 0 && usernameValid
                     ? '#1A7A4A'
                     : C.border,
@@ -457,24 +533,24 @@ function RegisterForm() {
         </div>
 
         {/* Email */}
-        <div>
+        <div className="auth-anim" style={anim('0.49s', '0.5s')}>
           <label style={labelStyle}>Email</label>
           <input type="email" className="auth-input"
             value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => touch('email')}
             autoComplete="email" placeholder="you@example.com"
-            style={{ ...inputBase, borderColor: emailError ? '#8B1520' : C.border }}
+            style={{ ...inputBase, borderColor: emailError ? C.crimson : C.border }}
           />
           <FieldError msg={emailError} />
         </div>
 
         {/* Password */}
-        <div>
+        <div className="auth-anim" style={anim('0.56s', '0.5s')}>
           <label style={labelStyle}>Password</label>
           <div style={{ position: 'relative' }}>
             <input type={showPassword ? 'text' : 'password'} className="auth-input"
               value={password} onChange={(e) => setPassword(e.target.value)} onBlur={() => touch('password')}
               autoComplete="new-password" minLength={8} placeholder="••••••••"
-              style={{ ...inputBase, paddingRight: '44px', borderColor: passwordError ? '#8B1520' : C.border }}
+              style={{ ...inputBase, paddingRight: '44px', borderColor: passwordError ? C.crimson : C.border }}
             />
             <button type="button" tabIndex={-1} onClick={() => setShowPassword((v) => !v)}
               aria-label={showPassword ? 'Hide password' : 'Show password'} style={eyeStyle}>
@@ -486,7 +562,7 @@ function RegisterForm() {
         </div>
 
         {/* Date of birth */}
-        <div>
+        <div className="auth-anim" style={anim('0.63s', '0.5s')}>
           <label style={labelStyle}>
             Date of Birth{' '}
             <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 300 }}>(optional)</span>
@@ -498,7 +574,7 @@ function RegisterForm() {
         </div>
 
         {/* Gender */}
-        <div>
+        <div className="auth-anim" style={anim('0.70s', '0.5s')}>
           <label style={{ ...labelStyle, marginBottom: '10px' }}>
             Gender{' '}
             <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 300 }}>(optional)</span>
@@ -530,19 +606,34 @@ function RegisterForm() {
 
         {/* Server error */}
         {error && (
-          <div style={{ background: 'rgba(139,21,32,0.12)', border: `1px solid ${C.crimson}`, borderRadius: '4px', padding: '10px 12px', fontSize: '0.8rem', color: '#E05555', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'DM Sans', sans-serif" }}>
+          <div style={{
+            background: 'rgba(139,21,32,0.12)', border: `1px solid ${C.crimson}`,
+            borderRadius: '4px', padding: '10px 12px', fontSize: '0.8rem',
+            color: '#E05555', display: 'flex', alignItems: 'center', gap: '8px',
+            fontFamily: "'DM Sans', sans-serif",
+          }}>
             <AlertCircle size={14} className="shrink-0" />
             {error}
           </div>
         )}
 
-        <SubmitBtn loading={loading} disabled={!canSubmit}>
-          {loading ? 'Creating account…' : 'Create account'}
-        </SubmitBtn>
+        {/* Submit */}
+        <div className="auth-anim" style={anim('0.77s', '0.5s')}>
+          <SubmitBtn loading={loading} disabled={!canSubmit}>
+            {loading ? 'Creating account…' : 'Create account'}
+          </SubmitBtn>
+        </div>
 
       </form>
 
-      <p style={{ textAlign: 'center', marginTop: '1.6rem', fontSize: '0.78rem', color: C.muted, fontFamily: "'DM Sans', sans-serif" }}>
+      <p
+        className="auth-anim"
+        style={{
+          textAlign: 'center', marginTop: '1.6rem', fontSize: '0.78rem',
+          color: C.muted, fontFamily: "'DM Sans', sans-serif",
+          ...anim('0.84s', '0.5s'),
+        }}
+      >
         Already have an account?{' '}
         <Link to="/login" className="auth-link" style={{ color: C.crimsonH, textDecoration: 'none' }}>
           Sign in
@@ -553,7 +644,7 @@ function RegisterForm() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   LEFT PANEL — fully new visual component
+   LEFT PANEL — atmosphere, depth, staggered animations
 ═══════════════════════════════════════════════════════════════ */
 function LeftPanel() {
   return (
@@ -566,7 +657,7 @@ function LeftPanel() {
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'space-between',
-      padding: '2.5rem 3.5rem',
+      padding: '3rem 3.5rem',
     }}>
 
       {/* Layer 1 — radial crimson glow */}
@@ -590,7 +681,7 @@ function LeftPanel() {
         right: '-60px',
         top: '50%',
         transform: 'translateY(-50%)',
-        opacity: 0.06,
+        opacity: 0.05,
         pointerEvents: 'none',
       }}>
         <svg width="480" height="480" viewBox="0 0 80 80" fill="none">
@@ -602,11 +693,18 @@ function LeftPanel() {
       </div>
 
       {/* TOP — logo + brand name */}
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div
+        className="auth-anim"
+        style={{
+          position: 'relative', zIndex: 1,
+          display: 'flex', alignItems: 'center', gap: '12px',
+          ...anim('0s', '0.6s'),
+        }}
+      >
         <LogoMark size={38} />
         <span style={{
           fontFamily: "'Cormorant Garamond', serif",
-          fontWeight: 600,
+          fontWeight: 700,
           fontSize: '1.4rem',
           letterSpacing: '0.03em',
           color: C.white,
@@ -617,6 +715,8 @@ function LeftPanel() {
 
       {/* MIDDLE — tagline + divider + features */}
       <div style={{ position: 'relative', zIndex: 1 }}>
+
+        {/* Tagline — each line animated separately */}
         <div style={{
           fontFamily: "'Cormorant Garamond', serif",
           fontWeight: 700,
@@ -624,38 +724,38 @@ function LeftPanel() {
           lineHeight: 1.08,
           marginBottom: '1.5rem',
         }}>
-          <div style={{ color: C.white }}>Connect.</div>
-          <div style={{ color: C.white }}>Share.</div>
-          <div style={{ color: C.crimsonH }}>Play.</div>
+          <div className="auth-anim" style={{ color: C.white,   ...anim('0.1s', '0.7s') }}>Connect.</div>
+          <div className="auth-anim" style={{ color: C.white,   ...anim('0.2s', '0.7s') }}>Share.</div>
+          <div className="auth-anim" style={{ color: C.crimsonH,...anim('0.3s', '0.7s') }}>Play.</div>
         </div>
 
-        {/* Crimson rule */}
-        <div style={{ width: '48px', height: '2px', background: C.crimson, marginBottom: '1.8rem' }} />
-
-        {/* Feature list */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-          {[
-            'Friend graph with smart suggestions',
-            'Real-time chat and group messaging',
-            'Multiplayer games built in',
-          ].map((text) => (
-            <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '6px', height: '6px',
-                borderRadius: '50%',
-                background: C.crimson,
-                flexShrink: 0,
-              }} />
-              <span style={{
-                fontFamily: "'DM Sans', sans-serif",
-                fontWeight: 300,
-                fontSize: '0.85rem',
-                color: C.muted,
-              }}>
-                {text}
-              </span>
-            </div>
-          ))}
+        {/* Divider + feature list — animated as a unit */}
+        <div className="auth-anim" style={anim('0.45s', '0.6s')}>
+          <div style={{ width: '48px', height: '2px', background: C.crimson, marginBottom: '1.8rem' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            {[
+              'Friend graph with smart suggestions',
+              'Real-time chat and group messaging',
+              'Multiplayer games built in',
+            ].map((text) => (
+              <div key={text} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '6px', height: '6px',
+                  borderRadius: '50%',
+                  background: C.crimson,
+                  flexShrink: 0,
+                }} />
+                <span style={{
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 300,
+                  fontSize: '0.85rem',
+                  color: C.muted,
+                }}>
+                  {text}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -663,7 +763,7 @@ function LeftPanel() {
       <div style={{ position: 'relative', zIndex: 1 }}>
         <p style={{
           fontSize: '0.75rem',
-          color: 'rgba(245,240,239,0.2)',
+          color: C.hint,
           fontFamily: "'DM Sans', sans-serif",
           fontWeight: 300,
         }}>
@@ -725,11 +825,15 @@ export default function AuthPage({ mode }) {
           <div style={{ width: '100%', maxWidth: '380px' }}>
 
             {/* Tab row */}
-            <div style={{
-              display: 'flex',
-              borderBottom: `1px solid ${C.border}`,
-              marginBottom: '2rem',
-            }}>
+            <div
+              className="auth-anim"
+              style={{
+                display: 'flex',
+                borderBottom: `1px solid ${C.border}`,
+                marginBottom: '2rem',
+                ...anim('0.15s', '0.5s'),
+              }}
+            >
               {[
                 { to: '/login',    label: 'Sign in',        active: isLogin  },
                 { to: '/register', label: 'Create account', active: !isLogin },
@@ -737,6 +841,7 @@ export default function AuthPage({ mode }) {
                 <Link
                   key={tab.to}
                   to={tab.to}
+                  className="auth-tab-link"
                   style={{
                     position: 'relative',
                     marginRight: tab.to === '/login' ? '1.6rem' : 0,
@@ -748,7 +853,6 @@ export default function AuthPage({ mode }) {
                     textTransform: 'uppercase',
                     color: tab.active ? C.white : C.muted,
                     textDecoration: 'none',
-                    transition: 'color 0.15s',
                   }}
                 >
                   {tab.label}
