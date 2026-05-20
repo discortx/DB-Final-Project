@@ -194,12 +194,18 @@ export default function RightPanel() {
     setRejectingGame((s) => { const n = new Set(s); n.delete(invite.id); return n; });
   };
 
-  const smallBtn = (bg, color, cursor = 'pointer') => ({
-    fontSize: '0.7rem', fontWeight: 600,
-    padding: '2px 9px', borderRadius: '4px',
-    background: bg, color, border: 'none',
-    cursor, transition: 'background 0.15s', lineHeight: '18px',
-  });
+  const smallBtn = (bg, color, cursor = 'pointer') => {
+    const isPrimary = bg === '#8B1520';
+    return {
+      fontSize: '0.7rem', fontWeight: 600,
+      padding: '3px 10px', borderRadius: '8px',
+      background: isPrimary ? 'linear-gradient(135deg, #A8192B 0%, #8B1520 100%)' : bg,
+      color,
+      border: isPrimary ? '1px solid rgba(196,30,51,0.4)' : '1px solid rgba(255,255,255,0.1)',
+      cursor, transition: 'all 0.15s', lineHeight: '18px',
+      boxShadow: isPrimary ? '0 1px 8px rgba(139,21,32,0.25)' : 'none',
+    };
+  };
 
   const GAMES = [
     { label: 'Snake',     to: '/games/snake',   Icon: Activity  },

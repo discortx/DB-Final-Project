@@ -446,7 +446,7 @@ export default function ProfilePage() {
     fontSize: '0.8rem',
     background: 'none',
     border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 6,
+    borderRadius: 8,
     padding: '5px 12px',
     cursor: 'pointer',
     transition: 'background 0.15s, color 0.15s',

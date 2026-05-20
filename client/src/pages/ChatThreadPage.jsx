@@ -111,7 +111,7 @@ function TypingIndicator({ names }) {
 
 const infoBtnStyle = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-  width: 28, height: 28, borderRadius: 6,
+  width: 28, height: 28, borderRadius: '50%',
   background: 'none', border: 'none',
   color: 'rgba(245,240,239,0.55)', cursor: 'pointer',
 };
@@ -299,8 +299,10 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated, onL
                     type="button"
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 4,
-                      background: '#8B1520', border: 'none', color: '#F5F0EF',
-                      borderRadius: 6, padding: '4px 12px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                      background: 'linear-gradient(135deg, #A8192B 0%, #8B1520 100%)',
+                      border: '1px solid rgba(196,30,51,0.4)', color: '#F5F0EF',
+                      borderRadius: 8, padding: '4px 12px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+                      boxShadow: '0 1px 8px rgba(139,21,32,0.25)',
                     }}
                     onClick={handleSaveName}
                     disabled={savingName || !nameVal.trim()}
@@ -313,7 +315,7 @@ function GroupInfoPanel({ chat, currentUserId, open, onClose, onChatUpdated, onL
                     style={{
                       display: 'inline-flex', alignItems: 'center',
                       background: 'none', border: '1px solid rgba(255,255,255,0.1)',
-                      color: 'rgba(245,240,239,0.7)', borderRadius: 6,
+                      color: 'rgba(245,240,239,0.7)', borderRadius: 8,
                       padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
                     }}
                     onClick={() => { setEditing(false); setNameVal(chat?.name || ''); }}
@@ -698,7 +700,7 @@ export default function ChatThreadPage() {
               background: 'none',
               border: '1px solid rgba(255,255,255,0.1)',
               color: 'rgba(245,240,239,0.7)',
-              borderRadius: 6, padding: '5px 12px',
+              borderRadius: 8, padding: '5px 12px',
               fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
             }}
             onClick={() => navigate('/chats')}

@@ -25,19 +25,26 @@ const TYPE_CONFIG = {
 export default function NotificationItem({ notification, onClick, onDismiss }) {
   const config = TYPE_CONFIG[notification.type] || { Icon: MessageCircle };
   const { Icon } = config;
+  const isUnread = !notification.is_read;
 
   return (
     <div
       onClick={() => onClick(notification)}
-      className={`flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors relative group border-l-4 ${
-        !notification.is_read
-          ? 'bg-[#F7F7F7] border-[#0A0A0A]'
-          : 'bg-white border-transparent'
-      }`}
+      className="flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors relative group hover:bg-white/[0.03]"
+      style={{
+        background: isUnread ? 'rgba(139,21,32,0.07)' : 'transparent',
+        borderLeft: `3px solid ${isUnread ? '#8B1520' : 'transparent'}`,
+      }}
     >
       {/* Type icon circle */}
-      <div className="w-8 h-8 rounded-full bg-[#0A0A0A] flex items-center justify-center shrink-0 mt-0.5">
-        <Icon size={14} className="text-white" />
+      <div
+        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+        style={{
+          background: 'rgba(139,21,32,0.15)',
+          border: '1px solid rgba(139,21,32,0.25)',
+        }}
+      >
+        <Icon size={14} style={{ color: 'rgba(245,240,239,0.7)' }} />
       </div>
 
       {/* Sender avatar */}
@@ -49,10 +56,16 @@ export default function NotificationItem({ notification, onClick, onDismiss }) {
 
       {/* Text column */}
       <div className="flex-1 min-w-0 pr-6">
-        <p className="text-sm text-[#0A0A0A] leading-snug">
+        <p
+          className="text-sm leading-snug"
+          style={{ color: isUnread ? '#F5F0EF' : 'rgba(245,240,239,0.75)' }}
+        >
           {notification.text}
         </p>
-        <span className="text-[10px] text-[#888888] mt-0.5 block">
+        <span
+          className="mt-0.5 block"
+          style={{ color: 'rgba(245,240,239,0.38)', fontSize: '10px' }}
+        >
           {relativeTime(notification.created_at)}
         </span>
       </div>
@@ -64,7 +77,8 @@ export default function NotificationItem({ notification, onClick, onDismiss }) {
           e.stopPropagation();
           onDismiss(notification.id);
         }}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-[#EFEFEF] text-[#888888] hover:text-[#0A0A0A]"
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-white/5"
+        style={{ color: 'rgba(245,240,239,0.45)', background: 'none', border: 'none', cursor: 'pointer' }}
         aria-label="Dismiss notification"
       >
         <X size={14} />

@@ -31,7 +31,7 @@ const inputStyle = {
 
 const iconBtnStyle = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-  width: 32, height: 32, borderRadius: 6,
+  width: 32, height: 32, borderRadius: '50%',
   background: 'none', border: 'none',
   color: 'rgba(245,240,239,0.6)', cursor: 'pointer',
 };
@@ -202,13 +202,15 @@ function NewGroupModal({ open, onClose, onCreated }) {
   const ghostBtnStyle = {
     display: 'inline-flex', alignItems: 'center', gap: 4,
     background: 'none', border: '1px solid rgba(255,255,255,0.12)',
-    color: 'rgba(245,240,239,0.75)', borderRadius: 6,
+    color: 'rgba(245,240,239,0.75)', borderRadius: 8,
     padding: '6px 14px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
   };
   const primaryBtnStyle = {
     display: 'inline-flex', alignItems: 'center', gap: 6,
-    background: '#8B1520', border: 'none', color: '#F5F0EF',
-    borderRadius: 6, padding: '6px 14px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
+    background: 'linear-gradient(135deg, #A8192B 0%, #8B1520 100%)',
+    border: '1px solid rgba(196,30,51,0.4)', color: '#F5F0EF',
+    borderRadius: 8, padding: '6px 14px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
+    boxShadow: '0 2px 12px rgba(139,21,32,0.3)',
   };
 
   return (
@@ -468,9 +470,11 @@ export default function ChatsPage() {
                     type="button"
                     onClick={() => setDmModalOpen(true)}
                     style={{
-                      background: '#8B1520', border: 'none', color: '#F5F0EF',
-                      borderRadius: 6, padding: '5px 14px', fontSize: '0.8rem',
+                      background: 'linear-gradient(135deg, #A8192B 0%, #8B1520 100%)',
+                      border: '1px solid rgba(196,30,51,0.4)', color: '#F5F0EF',
+                      borderRadius: 8, padding: '5px 14px', fontSize: '0.8rem',
                       fontWeight: 600, cursor: 'pointer',
+                      boxShadow: '0 2px 12px rgba(139,21,32,0.3)',
                     }}
                   >
                     Start a DM

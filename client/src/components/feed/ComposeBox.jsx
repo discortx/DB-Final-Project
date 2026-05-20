@@ -45,7 +45,7 @@ function VisibilityDropdown({ value, onChange }) {
         className="compose-tag-btn flex items-center gap-1.5 transition-colors cursor-pointer"
         style={{
           fontSize: '0.75rem', color: 'rgba(245,240,239,0.5)',
-          border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px',
+          border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
           padding: '4px 10px', background: 'transparent',
         }}
       >
@@ -348,7 +348,7 @@ export default function ComposeBox({ onPost }) {
                   className="compose-tag-btn flex items-center gap-1.5 transition-colors cursor-pointer"
                   style={{
                     fontSize: '0.75rem', color: 'rgba(245,240,239,0.5)',
-                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px',
                     padding: '4px 10px', background: 'transparent',
                   }}
                 >
@@ -379,13 +379,19 @@ export default function ComposeBox({ onPost }) {
                   onClick={handleSubmit}
                   style={{
                     fontSize: '0.82rem', fontWeight: 600,
-                    background: canPost ? '#8B1520' : 'rgba(139,21,32,0.3)',
-                    color: canPost ? '#F5F0EF' : 'rgba(245,240,239,0.4)',
-                    border: 'none', borderRadius: '6px',
+                    background: canPost
+                      ? 'linear-gradient(135deg, #A8192B 0%, #8B1520 100%)'
+                      : 'rgba(139,21,32,0.25)',
+                    color: canPost ? '#F5F0EF' : 'rgba(245,240,239,0.35)',
+                    border: canPost
+                      ? '1px solid rgba(196,30,51,0.4)'
+                      : '1px solid rgba(139,21,32,0.15)',
+                    borderRadius: '8px',
                     padding: '5px 18px',
                     cursor: canPost ? 'pointer' : 'not-allowed',
                     display: 'inline-flex', alignItems: 'center', gap: '5px',
-                    transition: 'background 0.15s',
+                    transition: 'all 0.2s ease',
+                    boxShadow: canPost ? '0 2px 12px rgba(139,21,32,0.3)' : 'none',
                   }}
                 >
                   {submitting && <Loader2 size={13} className="animate-spin" />}

@@ -237,8 +237,10 @@ export default function TicTacToePage() {
             type="button"
             className="mt-4"
             style={{
-              background: '#8B1520', border: 'none', color: '#F5F0EF',
-              borderRadius: 6, padding: '8px 18px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
+              background: 'linear-gradient(135deg, #A8192B 0%, #8B1520 100%)',
+              border: '1px solid rgba(196,30,51,0.4)', color: '#F5F0EF',
+              borderRadius: 8, padding: '8px 18px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
+              boxShadow: '0 2px 12px rgba(139,21,32,0.3)',
             }}
             onClick={() => navigate('/games')}
           >
@@ -307,13 +309,15 @@ export default function TicTacToePage() {
 
   const primaryBtnStyle = {
     display: 'inline-flex', alignItems: 'center',
-    background: '#8B1520', border: 'none', color: '#F5F0EF',
-    borderRadius: 6, padding: '8px 18px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
+    background: 'linear-gradient(135deg, #A8192B 0%, #8B1520 100%)',
+    border: '1px solid rgba(196,30,51,0.4)', color: '#F5F0EF',
+    borderRadius: 8, padding: '8px 18px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
+    boxShadow: '0 2px 12px rgba(139,21,32,0.3)',
   };
   const secondaryBtnStyle = {
     display: 'inline-flex', alignItems: 'center',
     background: 'none', border: '1px solid rgba(255,255,255,0.15)',
-    color: 'rgba(245,240,239,0.75)', borderRadius: 6,
+    color: 'rgba(245,240,239,0.75)', borderRadius: 8,
     padding: '8px 18px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
   };
 

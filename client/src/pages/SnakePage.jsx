@@ -469,9 +469,11 @@ export default function SnakePage() {
                 <button
                   type="button"
                   style={{
-                    background: '#8B1520', color: '#F5F0EF', border: 'none',
-                    borderRadius: 6, padding: '8px 24px', fontSize: '0.875rem',
+                    background: 'linear-gradient(135deg, #A8192B 0%, #8B1520 100%)',
+                    color: '#F5F0EF', border: '1px solid rgba(196,30,51,0.4)',
+                    borderRadius: 8, padding: '8px 24px', fontSize: '0.875rem',
                     fontWeight: 600, cursor: 'pointer',
+                    boxShadow: '0 2px 12px rgba(139,21,32,0.3)',
                   }}
                   onClick={startGame}
                 >
@@ -482,7 +484,7 @@ export default function SnakePage() {
                   style={{
                     background: 'none', color: 'rgba(245,240,239,0.75)',
                     border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: 6, padding: '6px 16px', fontSize: '0.875rem',
+                    borderRadius: 8, padding: '6px 16px', fontSize: '0.875rem',
                     fontWeight: 500, cursor: 'pointer',
                   }}
                   onClick={() => navigate('/games')}

@@ -48,28 +48,32 @@ const cardStyle = {
 
 const primaryBtnStyle = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-  width: '100%', background: '#8B1520', border: 'none', color: '#F5F0EF',
-  borderRadius: 6, padding: '8px 14px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
+  width: '100%', background: 'linear-gradient(135deg, #A8192B 0%, #8B1520 100%)',
+  border: '1px solid rgba(196,30,51,0.4)', color: '#F5F0EF',
+  borderRadius: 8, padding: '8px 14px', fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer',
+  boxShadow: '0 2px 12px rgba(139,21,32,0.3)',
 };
 
 const ghostBtnStyle = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
   background: 'none', border: '1px solid rgba(255,255,255,0.12)',
-  color: 'rgba(245,240,239,0.75)', borderRadius: 6,
+  color: 'rgba(245,240,239,0.75)', borderRadius: 8,
   padding: '5px 12px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
 };
 
 const dangerBtnStyle = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
   background: 'none', border: '1px solid rgba(139,21,32,0.3)',
-  color: '#E87080', borderRadius: 6,
+  color: '#E87080', borderRadius: 8,
   padding: '5px 10px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer',
 };
 
 const acceptSmBtnStyle = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
-  background: '#8B1520', border: 'none', color: '#F5F0EF',
-  borderRadius: 6, padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+  background: 'linear-gradient(135deg, #A8192B 0%, #8B1520 100%)',
+  border: '1px solid rgba(196,30,51,0.4)', color: '#F5F0EF',
+  borderRadius: 8, padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+  boxShadow: '0 1px 8px rgba(139,21,32,0.25)',
 };
 
 const resumeBtnStyle = { ...acceptSmBtnStyle };
