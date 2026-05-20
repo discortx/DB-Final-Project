@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Search, Bell, MessageCircle, Gamepad2,
@@ -343,126 +344,131 @@ export default function Topbar() {
         </div>
       </header>
 
-      {/* Notification drawer backdrop */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-40" onClick={() => setDrawerOpen(false)}>
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }} />
-        </div>
-      )}
-
-      {/* Notification drawer */}
-      <div
-        className={`fixed right-0 top-0 bottom-0 z-50 flex flex-col transition-transform duration-300 ease-in-out ${drawerOpen ? 'translate-x-0' : 'translate-x-full'}`}
-        style={{
-          width: 'min(360px, 100vw)',
-          background: 'rgba(14,10,12,0.92)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          borderLeft: '1px solid rgba(255,255,255,0.09)',
-          boxShadow: '-12px 0 48px rgba(0,0,0,0.7)',
-        }}
-      >
-        {/* Drawer header */}
-        <div
-          className="flex items-center justify-between px-4 py-3 shrink-0"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
-        >
-          <h2 style={{ color: '#F5F0EF', fontSize: '0.95rem', fontWeight: 600 }}>
-            Notifications
-          </h2>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleMarkAll}
-              className="px-2 py-1 rounded transition-colors hover:text-white/70"
-              style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.75rem', background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              Mark all read
-            </button>
-            <button
-              type="button"
-              onClick={() => setDrawerOpen(false)}
-              className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-white/5"
-              style={{ color: 'rgba(245,240,239,0.45)', background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              <X size={15} />
-            </button>
-          </div>
-        </div>
-
-        {/* Drawer body */}
-        <div className="flex-1 overflow-y-auto">
-          {notifsLoading ? (
-            <div className="p-4 space-y-3">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-3 px-1 py-2">
-                  <div
-                    className="shrink-0 w-9 h-9 rounded-full skeleton-pulse"
-                    style={{ background: 'rgba(255,255,255,0.07)' }}
-                  />
-                  <div className="flex-1 space-y-2">
-                    <div className="skeleton-pulse h-3 w-4/5 rounded" style={{ background: 'rgba(255,255,255,0.07)' }} />
-                    <div className="skeleton-pulse h-2.5 w-1/2 rounded" style={{ background: 'rgba(255,255,255,0.05)' }} />
-                  </div>
-                </div>
-              ))}
+      {createPortal(
+        <>
+          {/* Notification drawer backdrop */}
+          {drawerOpen && (
+            <div className="fixed inset-0 z-40" onClick={() => setDrawerOpen(false)}>
+              <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }} />
             </div>
-          ) : notifsError ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <span style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.85rem' }}>
-                Could not load notifications.
-              </span>
-              <button
-                type="button"
-                onClick={loadNotifs}
-                style={{
-                  background: 'none', border: '1px solid rgba(255,255,255,0.12)',
-                  color: 'rgba(245,240,239,0.6)', borderRadius: '8px',
-                  padding: '4px 14px', fontSize: '0.78rem', cursor: 'pointer',
-                }}
-              >
-                Retry
-              </button>
-            </div>
-          ) : notifs.length === 0 ? (
-            <div className="flex items-center justify-center py-16">
-              <span style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.85rem' }}>
-                No notifications yet.
-              </span>
-            </div>
-          ) : (
-            notifs.map((n) => (
-              <NotificationItem
-                key={n.id}
-                notification={n}
-                onClick={(notif) => {
-                  setNotifs((prev) =>
-                    prev.map((x) => (x.id === notif.id ? { ...x, is_read: true } : x))
-                  );
-                }}
-                onDismiss={(id) => {
-                  setNotifs((prev) => prev.filter((x) => x.id !== id));
-                }}
-              />
-            ))
           )}
-        </div>
 
-        {/* Drawer footer */}
-        <div
-          className="shrink-0 py-3 text-center"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
-        >
-          <Link
-            to="/notifications"
-            onClick={() => setDrawerOpen(false)}
-            className="transition-colors hover:text-white/70"
-            style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.84rem' }}
+          {/* Notification drawer */}
+          <div
+            className={`fixed right-0 top-0 bottom-0 z-50 flex flex-col transition-transform duration-300 ease-in-out ${drawerOpen ? 'translate-x-0' : 'translate-x-full'}`}
+            style={{
+              width: 'min(360px, 100vw)',
+              background: 'rgba(14,10,12,0.92)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              borderLeft: '1px solid rgba(255,255,255,0.09)',
+              boxShadow: '-12px 0 48px rgba(0,0,0,0.7)',
+            }}
           >
-            View all notifications
-          </Link>
-        </div>
-      </div>
+            {/* Drawer header */}
+            <div
+              className="flex items-center justify-between px-4 py-3 shrink-0"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+            >
+              <h2 style={{ color: '#F5F0EF', fontSize: '0.95rem', fontWeight: 600 }}>
+                Notifications
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleMarkAll}
+                  className="px-2 py-1 rounded transition-colors hover:text-white/70"
+                  style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.75rem', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  Mark all read
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(false)}
+                  className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-white/5"
+                  style={{ color: 'rgba(245,240,239,0.45)', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            </div>
+
+            {/* Drawer body */}
+            <div className="flex-1 overflow-y-auto">
+              {notifsLoading ? (
+                <div className="p-4 space-y-3">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-3 px-1 py-2">
+                      <div
+                        className="shrink-0 w-9 h-9 rounded-full skeleton-pulse"
+                        style={{ background: 'rgba(255,255,255,0.07)' }}
+                      />
+                      <div className="flex-1 space-y-2">
+                        <div className="skeleton-pulse h-3 w-4/5 rounded" style={{ background: 'rgba(255,255,255,0.07)' }} />
+                        <div className="skeleton-pulse h-2.5 w-1/2 rounded" style={{ background: 'rgba(255,255,255,0.05)' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : notifsError ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <span style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.85rem' }}>
+                    Could not load notifications.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={loadNotifs}
+                    style={{
+                      background: 'none', border: '1px solid rgba(255,255,255,0.12)',
+                      color: 'rgba(245,240,239,0.6)', borderRadius: '8px',
+                      padding: '4px 14px', fontSize: '0.78rem', cursor: 'pointer',
+                    }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : notifs.length === 0 ? (
+                <div className="flex items-center justify-center py-16">
+                  <span style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.85rem' }}>
+                    No notifications yet.
+                  </span>
+                </div>
+              ) : (
+                notifs.map((n) => (
+                  <NotificationItem
+                    key={n.id}
+                    notification={n}
+                    onClick={(notif) => {
+                      setNotifs((prev) =>
+                        prev.map((x) => (x.id === notif.id ? { ...x, is_read: true } : x))
+                      );
+                    }}
+                    onDismiss={(id) => {
+                      setNotifs((prev) => prev.filter((x) => x.id !== id));
+                    }}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* Drawer footer */}
+            <div
+              className="shrink-0 py-3 text-center"
+              style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}
+            >
+              <Link
+                to="/notifications"
+                onClick={() => setDrawerOpen(false)}
+                className="transition-colors hover:text-white/70"
+                style={{ color: 'rgba(245,240,239,0.45)', fontSize: '0.84rem' }}
+              >
+                View all notifications
+              </Link>
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
     </>
   );
 }
