@@ -473,7 +473,7 @@ export default function ProfilePage() {
             <Avatar firstName={profile.first_name} lastName={profile.last_name} size="xl" />
 
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-baseline gap-2">
+              <div className="flex flex-col" style={{ gap: '4px' }}>
                 <h1
                   style={{
                     fontFamily: "'Cormorant Garamond', serif",
