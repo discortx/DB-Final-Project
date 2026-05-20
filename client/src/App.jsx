@@ -32,8 +32,9 @@ export default function App() {
           <Route path="/friends"             element={<FriendsPage tab="friends" />} />
           <Route path="/friends/requests"    element={<FriendsPage tab="requests" />} />
           <Route path="/friends/suggest"     element={<FriendsPage tab="suggestions" />} />
-          <Route path="/chats"               element={<ChatsPage />} />
-          <Route path="/chats/:id"           element={<ChatThreadPage />} />
+          <Route path="/chats" element={<ChatsPage />}>
+            <Route path=":id" element={<ChatThreadPage />} />
+          </Route>
           <Route path="/notifications"       element={<NotificationsPage />} />
           <Route path="/games"               element={<GamesLobbyPage />} />
           <Route path="/games/ttt/:id"       element={<TicTacToePage />} />

@@ -21,6 +21,7 @@ export default function AppShell() {
   const token       = useAuthStore((s) => s.token);
   const unreadCount = useNotifStore((s) => s.unreadCount);
   const location    = useLocation();
+  const isMessages  = location.pathname.startsWith('/chats');
 
   useEffect(() => {
     if (!token) return;
@@ -80,12 +81,20 @@ export default function AppShell() {
 
         {/* Main feed — transparent so orbs show through */}
         <main
-          className="flex-1 min-w-0 overflow-y-auto"
-          style={{ background: 'transparent', scrollbarGutter: 'stable' }}
+          className={`flex-1 min-w-0 ${isMessages ? 'overflow-hidden' : 'overflow-y-auto'}`}
+          style={{
+            background: 'transparent',
+            scrollbarGutter: isMessages ? undefined : 'stable',
+            ...(isMessages ? { display: 'flex', flexDirection: 'column' } : {}),
+          }}
         >
-          <div className="max-w-2xl mx-auto px-4 py-6 pb-20 md:pb-8">
+          {isMessages ? (
             <Outlet />
-          </div>
+          ) : (
+            <div className="max-w-2xl mx-auto px-4 py-6 pb-20 md:pb-8">
+              <Outlet />
+            </div>
+          )}
         </main>
 
         {/* Right panel — hidden below xl (1280px) */}

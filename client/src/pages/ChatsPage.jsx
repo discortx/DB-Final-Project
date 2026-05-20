@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { UserPlus, UsersRound, MessageCircle, X, Loader2 } from 'lucide-react';
 import { getChats, openDm, createGroup } from '../api/chats';
 import { searchUsers } from '../api/users';
@@ -372,24 +372,41 @@ export default function ChatsPage() {
   const activeMatch = location.pathname.match(/^\/chats\/([^/]+)/);
   const activeChatId = activeMatch ? activeMatch[1] : null;
 
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const chatListWidth = windowWidth < 1024 ? '260px' : '300px';
+  const showList   = !(windowWidth < 768 && activeChatId);
+  const showThread = !(windowWidth < 768 && !activeChatId);
+
   return (
     <>
       <style>{CHATS_CSS}</style>
-      {/* 2-column layout filling AppShell content area */}
-      <div className="flex h-[calc(100vh-56px)] -mt-6 -mx-4">
+      <div style={{ display: 'flex', width: '100%', flex: 1, overflow: 'hidden' }}>
+
         {/* ── Left panel: chat list ── */}
         <div
-          className="w-80 shrink-0 flex flex-col"
           style={{
-            background: 'rgba(16,13,14,0.7)',
+            width: showList ? chatListWidth : 0,
+            minWidth: showList ? chatListWidth : 0,
+            maxWidth: showList ? chatListWidth : 0,
+            flexShrink: 0,
+            height: '100%',
+            display: showList ? 'flex' : 'none',
+            flexDirection: 'column',
+            borderRight: '1px solid rgba(255,255,255,0.07)',
+            background: 'rgba(16,13,14,0.55)',
             backdropFilter: 'blur(16px)',
             WebkitBackdropFilter: 'blur(16px)',
-            borderRight: '1px solid rgba(255,255,255,0.07)',
           }}
         >
           {/* Header */}
           <div
-            className="sticky top-0 p-4 flex items-center shrink-0"
+            className="p-4 flex items-center shrink-0"
             style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
           >
             <h2
@@ -473,14 +490,27 @@ export default function ChatsPage() {
           </div>
         </div>
 
-        {/* ── Right panel: transparent placeholder ── */}
-        <div className="flex-1 hidden md:flex flex-col items-center justify-center">
-          {!activeChatId && (
-            <EmptyState
-              icon={MessageCircle}
-              title="Select a conversation"
-              description="Choose a chat from the list or start a new one."
-            />
+        {/* ── Right panel: thread outlet or empty state ── */}
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            height: '100%',
+            overflow: 'hidden',
+            display: showThread ? 'flex' : 'none',
+            flexDirection: 'column',
+          }}
+        >
+          {activeChatId ? (
+            <Outlet />
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <EmptyState
+                icon={MessageCircle}
+                title="Select a conversation"
+                description="Choose a chat from the list or start a new one."
+              />
+            </div>
           )}
         </div>
       </div>

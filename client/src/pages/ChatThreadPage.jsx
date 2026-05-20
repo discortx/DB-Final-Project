@@ -659,7 +659,7 @@ export default function ChatThreadPage() {
     return (
       <>
         <style>{THREAD_CSS}</style>
-        <div className="flex flex-col h-[calc(100vh-56px)] -mt-6 -mx-4">
+        <div className="flex flex-col" style={{ flex: 1, overflow: 'hidden' }}>
           <div
             className="h-14 px-4 flex items-center gap-3 shrink-0"
             style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
@@ -687,7 +687,7 @@ export default function ChatThreadPage() {
     return (
       <>
         <style>{THREAD_CSS}</style>
-        <div className="flex flex-col h-[calc(100vh-56px)] -mt-6 -mx-4 items-center justify-center gap-3">
+        <div className="flex flex-col items-center justify-center gap-3" style={{ flex: 1, overflow: 'hidden' }}>
           <p className="text-sm" style={{ color: 'rgba(245,240,239,0.45)' }}>
             Chat not found.
           </p>
@@ -716,7 +716,27 @@ export default function ChatThreadPage() {
   return (
     <>
       <style>{THREAD_CSS}</style>
-      <div className="flex flex-col h-[calc(100vh-56px)] -mt-6 -mx-4 relative overflow-hidden">
+      <div className="flex flex-col relative overflow-hidden" style={{ flex: 1 }}>
+        {/* Mobile back button */}
+        <div
+          className="md:hidden flex items-center shrink-0 px-3 py-1.5"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+        >
+          <button
+            type="button"
+            onClick={() => navigate('/chats')}
+            className="flex items-center gap-1"
+            style={{
+              background: 'none', border: 'none',
+              color: 'rgba(245,240,239,0.65)',
+              fontSize: '0.875rem', fontWeight: 500, cursor: 'pointer', padding: '4px 0',
+            }}
+          >
+            <ChevronLeft size={16} />
+            Chats
+          </button>
+        </div>
+
         {/* Header */}
         <ChatHeader
           chat={chat}
