@@ -4,18 +4,16 @@ import { ChevronLeft, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-r
 import { upsertSnakeScore, getSnakeLeaderboard } from '../api/games';
 import useAuthStore from '../store/authStore';
 import Avatar from '../components/ui/Avatar';
-import Skeleton from '../components/ui/Skeleton';
-import { SkeletonAvatar } from '../components/ui/Skeleton';
 
 // ─── Game constants ──────────────────────────────────────────────────────────
 const CELL_SIZE = 20;
 const COLS = 20;
 const ROWS = 20;
-const CANVAS_W = COLS * CELL_SIZE; // 400
-const CANVAS_H = ROWS * CELL_SIZE; // 400
+const CANVAS_W = COLS * CELL_SIZE;
+const CANVAS_H = ROWS * CELL_SIZE;
 const INITIAL_INTERVAL = 150;
-const SPEED_UP_EVERY = 5; // every 5 food, speed up
-const SPEED_UP_AMOUNT = 5; // ms reduction per level
+const SPEED_UP_EVERY = 5;
+const SPEED_UP_AMOUNT = 5;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function randomCell(snake) {
@@ -29,59 +27,61 @@ function randomCell(snake) {
   return pos;
 }
 
-function relativeTime(dateStr) {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
 // ─── Leaderboard ─────────────────────────────────────────────────────────────
 function LeaderboardTable({ entries, currentUserId }) {
   if (!entries.length) {
     return (
-      <p className="text-sm text-[#888888] text-center py-6">
+      <p className="text-sm text-center py-6" style={{ color: 'rgba(245,240,239,0.45)' }}>
         Play Snake to appear on the leaderboard!
       </p>
     );
   }
 
+  const rankColor = (rank) =>
+    rank === 1 ? '#F5C542'
+    : rank === 2 ? 'rgba(245,240,239,0.75)'
+    : rank === 3 ? 'rgba(245,240,239,0.55)'
+    : 'rgba(245,240,239,0.4)';
+
   return (
     <div className="w-full">
       <div className="grid grid-cols-[32px_1fr_64px_64px] gap-2 px-3 py-2">
-        <span className="text-[10px] uppercase tracking-widest text-[#888888] font-semibold">#</span>
-        <span className="text-[10px] uppercase tracking-widest text-[#888888] font-semibold">Player</span>
-        <span className="text-[10px] uppercase tracking-widest text-[#888888] font-semibold text-right">Score</span>
-        <span className="text-[10px] uppercase tracking-widest text-[#888888] font-semibold text-right">Date</span>
+        {['#', 'Player', 'Score', 'Date'].map((h, i) => (
+          <span
+            key={h}
+            className={`text-[10px] uppercase tracking-widest font-semibold${i >= 2 ? ' text-right' : ''}`}
+            style={{ color: 'rgba(245,240,239,0.4)' }}
+          >
+            {h}
+          </span>
+        ))}
       </div>
-      <div className="divide-y divide-[#E0E0E0]">
+      <div>
         {entries.map((entry) => {
           const isMe = String(entry.user_id) === String(currentUserId);
-          const rankColor =
-            entry.rank === 1 ? 'text-[#0A0A0A]'
-            : entry.rank === 2 ? 'text-[#404040]'
-            : entry.rank === 3 ? 'text-[#888888]'
-            : 'text-[#888888]';
           return (
             <div
               key={entry.user_id ?? entry.id}
-              className={`grid grid-cols-[32px_1fr_64px_64px] gap-2 items-center px-3 py-2.5 ${
-                isMe ? 'bg-[#F7F7F7] rounded-lg border-l-2 border-black' : ''
-              }`}
+              className="grid grid-cols-[32px_1fr_64px_64px] gap-2 items-center px-3 py-2.5"
+              style={
+                isMe
+                  ? { background: 'rgba(139,21,32,0.12)', borderLeft: '2px solid #8B1520', borderBottom: '1px solid rgba(255,255,255,0.06)' }
+                  : { borderBottom: '1px solid rgba(255,255,255,0.06)' }
+              }
             >
-              <span className={`font-bold text-sm ${rankColor}`}>{entry.rank}</span>
+              <span className="font-bold text-sm" style={{ color: rankColor(entry.rank) }}>
+                {entry.rank}
+              </span>
               <div className="flex items-center gap-2 min-w-0">
                 <Avatar size="sm" firstName={entry.first_name || ''} lastName={entry.last_name || ''} />
-                <span className="text-sm text-[#0A0A0A] truncate font-medium">
+                <span className="text-sm truncate font-medium" style={{ color: '#F5F0EF' }}>
                   {entry.first_name} {entry.last_name}
                 </span>
               </div>
-              <span className="font-bold text-sm text-right text-[#0A0A0A]">{entry.high_score}</span>
-              <span className="text-xs text-[#888888] text-right">
+              <span className="font-bold text-sm text-right" style={{ color: '#F5F0EF' }}>
+                {entry.high_score}
+              </span>
+              <span className="text-xs text-right" style={{ color: 'rgba(245,240,239,0.45)' }}>
                 {entry.updated_at
                   ? new Date(entry.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                   : '—'}
@@ -94,6 +94,17 @@ function LeaderboardTable({ entries, currentUserId }) {
   );
 }
 
+// ─── Loading leaderboard skeleton ────────────────────────────────────────────
+const SNAKE_CSS = `
+  @keyframes skeletonShimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
+  .skeleton-pulse {
+    background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.06) 75%);
+    background-size: 400px 100%;
+    animation: skeletonShimmer 1.6s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { .skeleton-pulse { animation: none; } }
+`;
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function SnakePage() {
   const navigate = useNavigate();
@@ -101,18 +112,16 @@ export default function SnakePage() {
 
   const canvasRef = useRef(null);
 
-  // ── Game state in refs (no re-renders for game loop) ──
   const snakeRef = useRef([{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }]);
   const dirRef = useRef({ x: 1, y: 0 });
-  const nextDirRef = useRef({ x: 1, y: 0 }); // buffer for input
+  const nextDirRef = useRef({ x: 1, y: 0 });
   const foodRef = useRef({ x: 5, y: 5 });
   const scoreRef = useRef(0);
-  const statusRef = useRef('idle'); // 'idle' | 'playing' | 'paused' | 'gameover'
+  const statusRef = useRef('idle');
   const intervalRef = useRef(null);
   const speedLevelRef = useRef(0);
   const isNewHighScoreRef = useRef(false);
 
-  // ── React state for display only ──
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
   const [gameStatus, setGameStatus] = useState('idle');
@@ -120,7 +129,6 @@ export default function SnakePage() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
 
-  // ── Draw function (reads from refs) ──
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -132,28 +140,22 @@ export default function SnakePage() {
     const status = statusRef.current;
     const currentScore = scoreRef.current;
 
-    // Background
-    ctx.fillStyle = '#FFFFFF';
+    // Background — dark
+    ctx.fillStyle = '#0A0809';
     ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-    // Grid lines (very light)
-    ctx.strokeStyle = '#F0F0F0';
+    // Grid lines (very faint)
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
     ctx.lineWidth = 0.5;
     for (let x = 0; x <= CANVAS_W; x += CELL_SIZE) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, CANVAS_H);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_H); ctx.stroke();
     }
     for (let y = 0; y <= CANVAS_H; y += CELL_SIZE) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(CANVAS_W, y);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); ctx.stroke();
     }
 
-    // Food (red square with slight rounding)
-    ctx.fillStyle = '#CC0000';
+    // Food (amber/yellow square)
+    ctx.fillStyle = '#F5C542';
     const fr = 3;
     const fx = food.x * CELL_SIZE + 2;
     const fy = food.y * CELL_SIZE + 2;
@@ -171,10 +173,10 @@ export default function SnakePage() {
     ctx.closePath();
     ctx.fill();
 
-    // Snake segments
+    // Snake segments — crimson
     snake.forEach((seg, i) => {
       const isHead = i === 0;
-      ctx.fillStyle = isHead ? '#0A0A0A' : i < 3 ? '#222222' : '#404040';
+      ctx.fillStyle = isHead ? '#8B1520' : i < 3 ? 'rgba(139,21,32,0.85)' : 'rgba(139,21,32,0.65)';
       const r = isHead ? 5 : 3;
       const sx = seg.x * CELL_SIZE + 1;
       const sy = seg.y * CELL_SIZE + 1;
@@ -196,47 +198,46 @@ export default function SnakePage() {
 
     // Overlays
     if (status === 'idle') {
-      ctx.fillStyle = 'rgba(0,0,0,0.60)';
+      ctx.fillStyle = 'rgba(10,8,9,0.72)';
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = '#F5F0EF';
       ctx.font = 'bold 36px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('SNAKE', CANVAS_W / 2, CANVAS_H / 2 - 24);
       ctx.font = '16px Inter, system-ui, sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.fillStyle = 'rgba(245,240,239,0.6)';
       ctx.fillText('Press Space to start', CANVAS_W / 2, CANVAS_H / 2 + 16);
     } else if (status === 'paused') {
-      ctx.fillStyle = 'rgba(0,0,0,0.40)';
+      ctx.fillStyle = 'rgba(10,8,9,0.5)';
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = '#F5F0EF';
       ctx.font = 'bold 32px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('PAUSED', CANVAS_W / 2, CANVAS_H / 2);
       ctx.font = '14px Inter, system-ui, sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.70)';
+      ctx.fillStyle = 'rgba(245,240,239,0.6)';
       ctx.fillText('Press Space to resume', CANVAS_W / 2, CANVAS_H / 2 + 36);
     } else if (status === 'gameover') {
-      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillStyle = 'rgba(10,8,9,0.82)';
       ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = '#F5F0EF';
       ctx.font = 'bold 32px Inter, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('GAME OVER', CANVAS_W / 2, CANVAS_H / 2 - 40);
       ctx.font = '18px Inter, system-ui, sans-serif';
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.fillStyle = 'rgba(245,240,239,0.85)';
       ctx.fillText(`Score: ${currentScore}`, CANVAS_W / 2, CANVAS_H / 2);
       if (isNewHighScoreRef.current) {
         ctx.font = 'bold 16px Inter, system-ui, sans-serif';
-        ctx.fillStyle = '#F59E0B';
+        ctx.fillStyle = '#F5C542';
         ctx.fillText('NEW HIGH SCORE!', CANVAS_W / 2, CANVAS_H / 2 + 34);
       }
     }
   }, []);
 
-  // ── Init game state ──
   const initGame = useCallback(() => {
     snakeRef.current = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
     dirRef.current = { x: 1, y: 0 };
@@ -249,40 +250,28 @@ export default function SnakePage() {
     setIsNewHighScore(false);
   }, []);
 
-  // ── Stop interval ──
   const stopInterval = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
   }, []);
 
-  // ── Game step (called on interval) ──
   const gameStep = useCallback(() => {
     const snake = snakeRef.current;
-    // Commit buffered direction
     dirRef.current = nextDirRef.current;
     const dir = dirRef.current;
-
     const head = snake[0];
     const nx = (head.x + dir.x + COLS) % COLS;
     const ny = (head.y + dir.y + ROWS) % ROWS;
 
-    // Check self collision
     if (snake.some((s) => s.x === nx && s.y === ny)) {
-      // Game over
       stopInterval();
       statusRef.current = 'gameover';
       setGameStatus('gameover');
-
       const finalScore = scoreRef.current;
       setScore(finalScore);
-
       setHighScore((prev) => {
         if (finalScore > prev) {
           isNewHighScoreRef.current = true;
           setIsNewHighScore(true);
-          // Submit to server
           upsertSnakeScore(finalScore)
             .then(() => getSnakeLeaderboard())
             .then((r) => setLeaderboard(r.data || []))
@@ -298,37 +287,27 @@ export default function SnakePage() {
 
     const newHead = { x: nx, y: ny };
     const ateFood = nx === foodRef.current.x && ny === foodRef.current.y;
-
     let newSnake;
     if (ateFood) {
       newSnake = [newHead, ...snake];
       const newScore = scoreRef.current + 1;
       scoreRef.current = newScore;
       setScore(newScore);
-
-      // Place new food
       foodRef.current = randomCell(newSnake);
-
-      // Speed up every SPEED_UP_EVERY food
       if (newScore % SPEED_UP_EVERY === 0) {
         speedLevelRef.current += 1;
         const newLevel = speedLevelRef.current;
         stopInterval();
-        const newInterval = Math.max(
-          60,
-          INITIAL_INTERVAL - newLevel * SPEED_UP_AMOUNT
-        );
+        const newInterval = Math.max(60, INITIAL_INTERVAL - newLevel * SPEED_UP_AMOUNT);
         intervalRef.current = setInterval(gameStep, newInterval);
       }
     } else {
       newSnake = [newHead, ...snake.slice(0, -1)];
     }
-
     snakeRef.current = newSnake;
     draw();
   }, [draw, stopInterval]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Start game ──
   const startGame = useCallback(() => {
     stopInterval();
     initGame();
@@ -338,7 +317,6 @@ export default function SnakePage() {
     draw();
   }, [stopInterval, initGame, gameStep, draw]);
 
-  // ── Pause ──
   const pauseGame = useCallback(() => {
     stopInterval();
     statusRef.current = 'paused';
@@ -346,7 +324,6 @@ export default function SnakePage() {
     draw();
   }, [stopInterval, draw]);
 
-  // ── Resume ──
   const resumeGame = useCallback(() => {
     statusRef.current = 'playing';
     setGameStatus('playing');
@@ -356,14 +333,11 @@ export default function SnakePage() {
     draw();
   }, [gameStep, draw]);
 
-  // ── Keyboard handler ──
   useEffect(() => {
     const handler = (e) => {
       const key = e.key;
       const status = statusRef.current;
       const currentDir = dirRef.current;
-
-      // Direction keys
       if (key === 'ArrowUp' || key === 'w' || key === 'W') {
         e.preventDefault();
         if (currentDir.y !== 1) nextDirRef.current = { x: 0, y: -1 };
@@ -378,42 +352,30 @@ export default function SnakePage() {
         if (currentDir.x !== -1) nextDirRef.current = { x: 1, y: 0 };
       } else if (key === ' ' || key === 'p' || key === 'P') {
         e.preventDefault();
-        if (status === 'idle' || status === 'gameover') {
-          startGame();
-        } else if (status === 'playing') {
-          pauseGame();
-        } else if (status === 'paused') {
-          resumeGame();
-        }
+        if (status === 'idle' || status === 'gameover') startGame();
+        else if (status === 'playing') pauseGame();
+        else if (status === 'paused') resumeGame();
       }
     };
-
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [startGame, pauseGame, resumeGame]);
 
-  // ── Mobile D-pad handler ──
   const handleDpad = useCallback((dirKey) => {
     const currentDir = dirRef.current;
     if (dirKey === 'up' && currentDir.y !== 1) nextDirRef.current = { x: 0, y: -1 };
     else if (dirKey === 'down' && currentDir.y !== -1) nextDirRef.current = { x: 0, y: 1 };
     else if (dirKey === 'left' && currentDir.x !== 1) nextDirRef.current = { x: -1, y: 0 };
     else if (dirKey === 'right' && currentDir.x !== -1) nextDirRef.current = { x: 1, y: 0 };
-
-    // Auto-start on first d-pad press
-    if (statusRef.current === 'idle' || statusRef.current === 'gameover') {
-      startGame();
-    }
+    if (statusRef.current === 'idle' || statusRef.current === 'gameover') startGame();
   }, [startGame]);
 
-  // ── Load leaderboard + initial draw on mount ──
   useEffect(() => {
     setLoadingLeaderboard(true);
     getSnakeLeaderboard()
       .then((r) => {
         const data = r.data || [];
         setLeaderboard(data);
-        // Set my high score
         if (user) {
           const me = data.find((e) => String(e.user_id) === String(user.id));
           if (me) setHighScore(me.high_score);
@@ -421,146 +383,177 @@ export default function SnakePage() {
       })
       .catch(() => {})
       .finally(() => setLoadingLeaderboard(false));
-
-    // Initial draw (idle overlay)
     draw();
-
     return () => stopInterval();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const dpadBtnStyle = {
+    width: 48, height: 48,
+    background: 'rgba(255,255,255,0.07)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', color: 'rgba(245,240,239,0.75)',
+    touchAction: 'none',
+  };
+
   return (
-    <div className="max-w-[540px] mx-auto pt-8 pb-12 px-4 text-center">
-      {/* Back link */}
-      <div className="flex items-center justify-start mb-2">
-        <Link
-          to="/games"
-          className="inline-flex items-center gap-1 text-sm text-[#888888] hover:text-[#0A0A0A] transition-colors"
+    <>
+      <style>{SNAKE_CSS}</style>
+      <div className="max-w-[540px] mx-auto pt-8 pb-12 px-4 text-center">
+        {/* Back link */}
+        <div className="flex items-center justify-start mb-2">
+          <Link
+            to="/games"
+            className="inline-flex items-center gap-1 text-sm transition-colors hover:text-white/70"
+            style={{ color: 'rgba(245,240,239,0.4)' }}
+          >
+            <ChevronLeft size={16} />
+            Back to Games
+          </Link>
+        </div>
+
+        <h2
+          className="mb-1"
+          style={{
+            fontFamily: "'Cormorant Garamond', serif",
+            fontWeight: 700,
+            fontSize: '1.65rem',
+            color: '#F5F0EF',
+          }}
         >
-          <ChevronLeft size={16} />
-          Back to Games
-        </Link>
-      </div>
-
-      <h2 className="text-2xl font-bold text-[#0A0A0A] mb-1">Snake</h2>
-      <p className="text-sm text-[#888888] mb-4">
-        Use arrow keys or WASD to move. Space to pause.
-      </p>
-
-      {/* Score display */}
-      <div className="flex items-center justify-center gap-8 mb-4">
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#888888]">
-            SCORE
-          </p>
-          <p className="text-4xl font-black text-[#0A0A0A] leading-none mt-1">
-            {score}
-          </p>
-        </div>
-        <div>
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#888888]">
-            BEST
-          </p>
-          <p className="text-sm text-[#888888] font-semibold leading-none mt-1">
-            {highScore > 0 ? highScore : '—'}
-          </p>
-        </div>
-      </div>
-
-      {/* Canvas wrapper */}
-      <div className="relative inline-block">
-        <canvas
-          ref={canvasRef}
-          width={CANVAS_W}
-          height={CANVAS_H}
-          className="border-2 border-[#0A0A0A] block"
-          style={{ imageRendering: 'pixelated' }}
-        />
-
-        {/* React overlay for game over (buttons only — canvas draws the text) */}
-        {gameStatus === 'gameover' && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-end pb-10 gap-3 pointer-events-none">
-            <div className="flex flex-col items-center gap-2 pointer-events-auto">
-              <button
-                type="button"
-                className="bg-white text-[#0A0A0A] rounded-none px-6 py-2 font-semibold text-sm hover:bg-[#F0F0F0] transition-colors border border-white"
-                onClick={startGame}
-              >
-                Play Again
-              </button>
-              <button
-                type="button"
-                className="text-white border border-white rounded-none px-4 py-2 text-sm hover:bg-white/10 transition-colors"
-                onClick={() => navigate('/games')}
-              >
-                Back to Games
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Mobile D-pad */}
-      <div className="flex flex-col items-center gap-1 mt-4 md:hidden">
-        <button
-          type="button"
-          className="w-12 h-12 bg-[#F7F7F7] border border-[#E0E0E0] rounded-md flex items-center justify-center hover:bg-[#EFEFEF] active:bg-[#E0E0E0] cursor-pointer touch-none"
-          onTouchStart={(e) => { e.preventDefault(); handleDpad('up'); }}
-          onClick={() => handleDpad('up')}
-        >
-          <ArrowUp size={18} />
-        </button>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            className="w-12 h-12 bg-[#F7F7F7] border border-[#E0E0E0] rounded-md flex items-center justify-center hover:bg-[#EFEFEF] active:bg-[#E0E0E0] cursor-pointer touch-none"
-            onTouchStart={(e) => { e.preventDefault(); handleDpad('left'); }}
-            onClick={() => handleDpad('left')}
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <button
-            type="button"
-            className="w-12 h-12 bg-[#F7F7F7] border border-[#E0E0E0] rounded-md flex items-center justify-center hover:bg-[#EFEFEF] active:bg-[#E0E0E0] cursor-pointer touch-none"
-            onTouchStart={(e) => { e.preventDefault(); handleDpad('down'); }}
-            onClick={() => handleDpad('down')}
-          >
-            <ArrowDown size={18} />
-          </button>
-          <button
-            type="button"
-            className="w-12 h-12 bg-[#F7F7F7] border border-[#E0E0E0] rounded-md flex items-center justify-center hover:bg-[#EFEFEF] active:bg-[#E0E0E0] cursor-pointer touch-none"
-            onTouchStart={(e) => { e.preventDefault(); handleDpad('right'); }}
-            onClick={() => handleDpad('right')}
-          >
-            <ArrowRight size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* Leaderboard preview */}
-      <div className="mt-10 text-left">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-[#888888] mb-4">
-          GLOBAL LEADERBOARD
+          Snake
+        </h2>
+        <p className="text-sm mb-4" style={{ color: 'rgba(245,240,239,0.45)' }}>
+          Use arrow keys or WASD to move. Space to pause.
         </p>
-        {loadingLeaderboard ? (
-          <div className="space-y-2">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center gap-3 px-3 py-2.5 border-b border-[#E0E0E0]">
-                <Skeleton className="w-8 h-4" />
-                <SkeletonAvatar size="sm" />
-                <Skeleton className="h-3 w-28" />
-                <Skeleton className="h-3 w-10 ml-auto" />
-                <Skeleton className="h-3 w-14" />
-              </div>
-            ))}
+
+        {/* Score display */}
+        <div className="flex items-center justify-center gap-8 mb-4">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(245,240,239,0.45)' }}>
+              SCORE
+            </p>
+            <p className="text-4xl font-black leading-none mt-1" style={{ color: '#F5F0EF' }}>
+              {score}
+            </p>
           </div>
-        ) : (
-          <LeaderboardTable
-            entries={leaderboard.slice(0, 5)}
-            currentUserId={user?.id}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(245,240,239,0.45)' }}>
+              BEST
+            </p>
+            <p className="text-sm font-semibold leading-none mt-1" style={{ color: 'rgba(245,240,239,0.55)' }}>
+              {highScore > 0 ? highScore : '—'}
+            </p>
+          </div>
+        </div>
+
+        {/* Canvas wrapper */}
+        <div className="relative inline-block">
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_W}
+            height={CANVAS_H}
+            className="block"
+            style={{
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 4,
+              imageRendering: 'pixelated',
+            }}
           />
-        )}
+
+          {/* React overlay for game over buttons */}
+          {gameStatus === 'gameover' && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-end pb-10 gap-3 pointer-events-none">
+              <div className="flex flex-col items-center gap-2 pointer-events-auto">
+                <button
+                  type="button"
+                  style={{
+                    background: '#8B1520', color: '#F5F0EF', border: 'none',
+                    borderRadius: 6, padding: '8px 24px', fontSize: '0.875rem',
+                    fontWeight: 600, cursor: 'pointer',
+                  }}
+                  onClick={startGame}
+                >
+                  Play Again
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    background: 'none', color: 'rgba(245,240,239,0.75)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: 6, padding: '6px 16px', fontSize: '0.875rem',
+                    fontWeight: 500, cursor: 'pointer',
+                  }}
+                  onClick={() => navigate('/games')}
+                >
+                  Back to Games
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile D-pad */}
+        <div className="flex flex-col items-center gap-1 mt-4 md:hidden">
+          <button
+            type="button"
+            style={dpadBtnStyle}
+            onTouchStart={(e) => { e.preventDefault(); handleDpad('up'); }}
+            onClick={() => handleDpad('up')}
+          >
+            <ArrowUp size={18} />
+          </button>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              style={dpadBtnStyle}
+              onTouchStart={(e) => { e.preventDefault(); handleDpad('left'); }}
+              onClick={() => handleDpad('left')}
+            >
+              <ArrowLeft size={18} />
+            </button>
+            <button
+              type="button"
+              style={dpadBtnStyle}
+              onTouchStart={(e) => { e.preventDefault(); handleDpad('down'); }}
+              onClick={() => handleDpad('down')}
+            >
+              <ArrowDown size={18} />
+            </button>
+            <button
+              type="button"
+              style={dpadBtnStyle}
+              onTouchStart={(e) => { e.preventDefault(); handleDpad('right'); }}
+              onClick={() => handleDpad('right')}
+            >
+              <ArrowRight size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Leaderboard preview */}
+        <div className="mt-10 text-left">
+          <p className="text-[10px] font-semibold uppercase tracking-widest mb-4" style={{ color: 'rgba(245,240,239,0.45)' }}>
+            GLOBAL LEADERBOARD
+          </p>
+          {loadingLeaderboard ? (
+            <div className="space-y-2">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-center gap-3 px-3 py-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="skeleton-pulse w-8 h-4 rounded" />
+                  <div className="skeleton-pulse w-6 h-6 rounded-full shrink-0" />
+                  <div className="skeleton-pulse h-3 w-28 rounded" />
+                  <div className="skeleton-pulse h-3 w-10 ml-auto rounded" />
+                  <div className="skeleton-pulse h-3 w-14 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <LeaderboardTable entries={leaderboard.slice(0, 5)} currentUserId={user?.id} />
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

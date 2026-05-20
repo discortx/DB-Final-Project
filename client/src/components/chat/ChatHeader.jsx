@@ -1,7 +1,20 @@
 import { Users, Info, Search } from 'lucide-react';
 import Avatar from '../ui/Avatar';
-import Button from '../ui/Button';
 import useToastStore from '../../store/toastStore';
+
+const iconBtnStyle = {
+  background: 'rgba(255,255,255,0.06)',
+  border: 'none',
+  cursor: 'pointer',
+  color: 'rgba(245,240,239,0.6)',
+  borderRadius: '50%',
+  width: 30,
+  height: 30,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transition: 'background 0.15s',
+};
 
 export default function ChatHeader({ chat, currentUserId, onOpenInfo }) {
   const addToast = useToastStore((s) => s.addToast);
@@ -16,7 +29,15 @@ export default function ChatHeader({ chat, currentUserId, onOpenInfo }) {
   const memberCount = (chat.members || []).length;
 
   return (
-    <div className="bg-white border-b border-[#E0E0E0] px-4 py-3 flex items-center gap-3 h-14 shrink-0">
+    <div
+      className="px-4 py-3 flex items-center gap-3 h-14 shrink-0"
+      style={{
+        background: 'rgba(12,9,10,0.9)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+      }}
+    >
       {/* Avatar / icon */}
       {chat.type === 'DM' ? (
         <Avatar
@@ -25,8 +46,14 @@ export default function ChatHeader({ chat, currentUserId, onOpenInfo }) {
           size="sm"
         />
       ) : (
-        <div className="w-9 h-9 bg-[#EFEFEF] rounded-full flex items-center justify-center shrink-0 border border-[#E0E0E0]">
-          <Users size={16} className="text-[#888888]" />
+        <div
+          className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+          style={{
+            background: 'rgba(139,21,32,0.15)',
+            border: '1px solid rgba(139,21,32,0.25)',
+          }}
+        >
+          <Users size={16} style={{ color: 'rgba(245,240,239,0.6)' }} />
         </div>
       )}
 
@@ -34,19 +61,25 @@ export default function ChatHeader({ chat, currentUserId, onOpenInfo }) {
       <div className="flex flex-col min-w-0 flex-1">
         {chat.type === 'DM' ? (
           <>
-            <span className="font-semibold text-sm text-[#0A0A0A] truncate">
+            <span
+              className="font-semibold text-sm truncate"
+              style={{ color: '#F5F0EF' }}
+            >
               {otherMember.first_name
                 ? `${otherMember.first_name} ${otherMember.last_name || ''}`.trim()
                 : chat.name || 'Direct Message'}
             </span>
-            <span className="text-xs text-[#1A7A4A]">Active now</span>
+            <span className="text-xs" style={{ color: '#4ABA80' }}>Active now</span>
           </>
         ) : (
           <>
-            <span className="font-semibold text-sm text-[#0A0A0A] truncate">
+            <span
+              className="font-semibold text-sm truncate"
+              style={{ color: '#F5F0EF' }}
+            >
               {chat.name || 'Group Chat'}
             </span>
-            <span className="text-xs text-[#888888]">
+            <span className="text-xs" style={{ color: 'rgba(245,240,239,0.45)' }}>
               {memberCount} member{memberCount !== 1 ? 's' : ''}
             </span>
           </>
@@ -54,25 +87,25 @@ export default function ChatHeader({ chat, currentUserId, onOpenInfo }) {
       </div>
 
       {/* Action buttons */}
-      <div className="flex gap-1 ml-auto shrink-0">
-        <Button
-          variant="ghost"
-          size="sm"
+      <div className="flex gap-1.5 ml-auto shrink-0">
+        <button
+          type="button"
           onClick={onOpenInfo}
-          className="p-1.5"
+          style={iconBtnStyle}
+          className="hover:bg-white/10 transition-colors"
           aria-label="Info"
         >
-          <Info size={18} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
+          <Info size={16} />
+        </button>
+        <button
+          type="button"
           onClick={() => addToast({ message: 'Coming soon', type: 'info' })}
-          className="p-1.5"
+          style={iconBtnStyle}
+          className="hover:bg-white/10 transition-colors"
           aria-label="Search messages"
         >
-          <Search size={18} />
-        </Button>
+          <Search size={16} />
+        </button>
       </div>
     </div>
   );

@@ -1,9 +1,34 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Loader2, UserPlus, Check } from 'lucide-react';
 import Avatar from '../ui/Avatar';
-import Button from '../ui/Button';
 import { sendRequest } from '../../api/friends';
 import useToastStore from '../../store/toastStore';
+
+const cardStyle = {
+  background: 'rgba(23,18,20,0.65)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 8,
+};
+
+const addBtnStyle = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+  width: '100%', background: '#8B1520', border: 'none', color: '#F5F0EF',
+  borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600,
+  cursor: 'pointer', marginTop: 12,
+};
+
+const sentBtnStyle = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+  width: '100%',
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.1)',
+  color: 'rgba(245,240,239,0.45)',
+  borderRadius: 6, padding: '6px 12px', fontSize: '0.8rem', fontWeight: 600,
+  cursor: 'default', marginTop: 12,
+};
 
 export default function SuggestionCard({ user, onSend }) {
   const navigate = useNavigate();
@@ -25,40 +50,32 @@ export default function SuggestionCard({ user, onSend }) {
   };
 
   return (
-    <div className="bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg p-4 flex flex-col items-center text-center hover:shadow-sm transition-shadow">
-      <Avatar
-        firstName={user.first_name}
-        lastName={user.last_name}
-        size="lg"
-      />
+    <div className="p-4 flex flex-col items-center text-center" style={cardStyle}>
+      <Avatar firstName={user.first_name} lastName={user.last_name} size="lg" />
       <p
-        className="font-semibold text-sm text-[#0A0A0A] mt-2 cursor-pointer hover:underline"
+        className="font-semibold text-sm mt-2 cursor-pointer hover:underline"
+        style={{ color: '#F5F0EF' }}
         onClick={() => navigate(`/profile/${user.id}`)}
       >
         {user.first_name} {user.last_name}
       </p>
-      <p className="text-xs text-[#888888]">@{user.username}</p>
-      <p className="text-xs text-[#888888] mt-1">Suggested for you</p>
+      <p className="text-xs" style={{ color: 'rgba(245,240,239,0.45)' }}>
+        @{user.username}
+      </p>
+      <p className="text-xs mt-1" style={{ color: 'rgba(245,240,239,0.35)' }}>
+        Suggested for you
+      </p>
 
       {sent ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled
-          className="w-full mt-3 text-sm"
-        >
-          Request Sent ✓
-        </Button>
+        <button type="button" style={sentBtnStyle} disabled>
+          <Check size={12} />
+          Request Sent
+        </button>
       ) : (
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleAdd}
-          loading={loading}
-          className="w-full mt-3 text-sm"
-        >
+        <button type="button" style={addBtnStyle} onClick={handleAdd} disabled={loading}>
+          {loading ? <Loader2 size={12} className="animate-spin" /> : <UserPlus size={12} />}
           Add Friend
-        </Button>
+        </button>
       )}
     </div>
   );

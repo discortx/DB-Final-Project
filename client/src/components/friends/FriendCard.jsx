@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageCircle, UserMinus } from 'lucide-react';
+import { MessageCircle, UserMinus, Loader2 } from 'lucide-react';
 import Avatar from '../ui/Avatar';
-import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import { unfriend } from '../../api/friends';
 import { openDm } from '../../api/chats';
@@ -33,6 +32,30 @@ function formatDate(dateStr) {
   }
 }
 
+const cardStyle = {
+  background: 'rgba(23,18,20,0.65)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 8,
+};
+
+const ghostBtnStyle = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  background: 'none', border: '1px solid rgba(255,255,255,0.12)',
+  color: 'rgba(245,240,239,0.75)', borderRadius: 6,
+  padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600,
+  cursor: 'pointer',
+};
+
+const dangerBtnStyle = {
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  background: 'none', border: '1px solid rgba(139,21,32,0.35)',
+  color: '#E87080', borderRadius: 6,
+  padding: '4px 10px', fontSize: '0.75rem', fontWeight: 600,
+  cursor: 'pointer',
+};
+
 export default function FriendCard({ friend, onUnfriend }) {
   const navigate = useNavigate();
   const addToast = useToastStore((s) => s.addToast);
@@ -50,10 +73,10 @@ export default function FriendCard({ friend, onUnfriend }) {
       if (chatId) {
         navigate(`/chats/${chatId}`);
       } else {
-        throw new Error("Chat ID not received from backend");
+        throw new Error('Chat ID not received from backend');
       }
     } catch (err) {
-      console.error("Failed to open DM:", err);
+      console.error('Failed to open DM:', err);
       addToast({ message: err?.response?.data?.error || 'Something went wrong', type: 'error' });
     } finally {
       setMessaging(false);
@@ -76,48 +99,45 @@ export default function FriendCard({ friend, onUnfriend }) {
 
   return (
     <>
-      <div className="flex flex-col p-3 bg-[#F7F7F7] border border-[#E0E0E0] rounded-lg hover:shadow-sm transition-shadow">
+      <div className="flex flex-col p-3" style={cardStyle}>
         <div className="flex items-center gap-3">
-          <Avatar
-            firstName={friend.first_name}
-            lastName={friend.last_name}
-            size="md"
-          />
+          <Avatar firstName={friend.first_name} lastName={friend.last_name} size="md" />
           <div className="flex-1 min-w-0">
             <p
-              className="font-semibold text-sm text-[#0A0A0A] cursor-pointer hover:underline truncate"
+              className="font-semibold text-sm cursor-pointer hover:underline truncate"
+              style={{ color: '#F5F0EF' }}
               onClick={() => navigate(`/profile/${friend.id}`)}
             >
               {friend.first_name} {friend.last_name}
             </p>
-            <p className="text-xs text-[#888888] truncate">@{friend.username}</p>
+            <p className="text-xs truncate" style={{ color: 'rgba(245,240,239,0.45)' }}>
+              @{friend.username}
+            </p>
             {friend.friends_since && (
-              <p className="text-xs text-[#888888]">
+              <p className="text-xs" style={{ color: 'rgba(245,240,239,0.35)' }}>
                 Friends since {formatDate(friend.friends_since)}
               </p>
             )}
           </div>
         </div>
         <div className="flex gap-2 mt-2">
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
+            type="button"
+            style={ghostBtnStyle}
             onClick={handleMessage}
-            loading={messaging}
-            className="flex items-center gap-1"
+            disabled={messaging}
           >
-            <MessageCircle size={14} />
+            {messaging ? <Loader2 size={12} className="animate-spin" /> : <MessageCircle size={12} />}
             Message
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
+          </button>
+          <button
+            type="button"
+            style={dangerBtnStyle}
             onClick={() => setConfirmOpen(true)}
-            className="flex items-center gap-1 text-[#CC0000] hover:text-[#CC0000] hover:bg-[#FFF0F0]"
           >
-            <UserMinus size={14} />
+            <UserMinus size={12} />
             Unfriend
-          </Button>
+          </button>
         </div>
       </div>
 
@@ -127,18 +147,28 @@ export default function FriendCard({ friend, onUnfriend }) {
         title="Remove Friend"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+            <button
+              type="button"
+              style={ghostBtnStyle}
+              onClick={() => setConfirmOpen(false)}
+            >
               Cancel
-            </Button>
-            <Button variant="danger" onClick={handleUnfriend} loading={unfriending}>
+            </button>
+            <button
+              type="button"
+              style={{ ...dangerBtnStyle, background: 'rgba(139,21,32,0.2)' }}
+              onClick={handleUnfriend}
+              disabled={unfriending}
+            >
+              {unfriending && <Loader2 size={12} className="animate-spin" />}
               Remove
-            </Button>
+            </button>
           </>
         }
       >
-        <p className="text-sm text-[#404040]">
+        <p className="text-sm" style={{ color: 'rgba(245,240,239,0.7)' }}>
           Remove{' '}
-          <span className="font-semibold text-[#0A0A0A]">
+          <span className="font-semibold" style={{ color: '#F5F0EF' }}>
             {friend.first_name} {friend.last_name}
           </span>{' '}
           from your friends? This cannot be undone.

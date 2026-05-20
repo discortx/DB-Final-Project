@@ -9,6 +9,18 @@ import Button from '../components/ui/Button';
 import EmptyState from '../components/ui/EmptyState';
 import Skeleton, { SkeletonText, SkeletonAvatar } from '../components/ui/Skeleton';
 
+const NOTIF_CSS = `
+  @keyframes skeletonShimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
+  .skeleton-pulse {
+    background: linear-gradient(90deg, rgba(255,255,255,0.06) 25%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.06) 75%);
+    background-size: 400px 100%;
+    animation: skeletonShimmer 1.6s ease-in-out infinite;
+  }
+  .notif-tab-btn { transition: color 0.15s, border-color 0.15s; }
+  .notif-tab-btn:hover { color: rgba(245,240,239,0.75) !important; }
+  @media (prefers-reduced-motion: reduce) { .skeleton-pulse { animation: none; } }
+`;
+
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 function isToday(date) {
@@ -93,7 +105,6 @@ export default function NotificationsPage() {
   useEffect(() => {
     load();
 
-    // Socket: new notification comes in
     const onNew = (notif) => {
       setNotifications((prev) => [notif, ...prev]);
       incrementUnread();
@@ -116,7 +127,6 @@ export default function NotificationsPage() {
   };
 
   const handleNotifClick = async (notif) => {
-    // Mark as read
     if (!notif.is_read) {
       try {
         await markRead(notif.id);
@@ -128,24 +138,14 @@ export default function NotificationsPage() {
       }
     }
 
-    // Navigate based on type
     switch (notif.type) {
-      case 'FRIEND_REQUEST':
-        navigate('/friends/requests');
-        break;
+      case 'FRIEND_REQUEST': navigate('/friends/requests'); break;
       case 'LIKE':
       case 'COMMENT':
-      case 'TAG':
-        navigate('/');
-        break;
-      case 'MESSAGE':
-        navigate('/chats');
-        break;
-      case 'GAME':
-        navigate('/games');
-        break;
-      default:
-        navigate('/');
+      case 'TAG':           navigate('/'); break;
+      case 'MESSAGE':       navigate('/chats'); break;
+      case 'GAME':          navigate('/games'); break;
+      default:              navigate('/');
     }
   };
 
@@ -158,84 +158,143 @@ export default function NotificationsPage() {
   const hasUnread = notifications.some((n) => !n.is_read);
 
   return (
-    <div className="max-w-[640px] mx-auto pt-6">
-      {/* Page header */}
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-[#0A0A0A]">Notifications</h1>
-        {hasUnread && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleMarkAllRead}
-            loading={markingAll}
+    <>
+      <style>{NOTIF_CSS}</style>
+      <div className="max-w-[640px] mx-auto pt-6">
+        {/* Page header */}
+        <div className="flex items-center justify-between mb-4">
+          <h1
+            style={{
+              fontFamily: "'Cormorant Garamond', serif",
+              fontWeight: 700,
+              fontSize: '1.65rem',
+              color: '#F5F0EF',
+            }}
           >
-            Mark all read
-          </Button>
+            Notifications
+          </h1>
+          {hasUnread && (
+            <button
+              type="button"
+              onClick={handleMarkAllRead}
+              disabled={markingAll}
+              className="transition-colors hover:text-white/70 cursor-pointer"
+              style={{
+                color: 'rgba(245,240,239,0.45)',
+                fontSize: '0.8rem',
+                background: 'none',
+                border: 'none',
+                padding: '4px 8px',
+              }}
+            >
+              {markingAll ? 'Marking…' : 'Mark all read'}
+            </button>
+          )}
+        </div>
+
+        {/* Filter tabs */}
+        <div
+          className="flex gap-1 mb-5 overflow-x-auto"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          {FILTER_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveFilter(tab.key)}
+              className="notif-tab-btn px-3 py-2 text-sm font-medium shrink-0 border-b-2 -mb-px cursor-pointer"
+              style={{
+                borderBottomColor: activeFilter === tab.key ? '#8B1520' : 'transparent',
+                color: activeFilter === tab.key
+                  ? '#F5F0EF'
+                  : 'rgba(245,240,239,0.45)',
+                background: 'none',
+                border: 'none',
+                borderBottom: `2px solid ${activeFilter === tab.key ? '#8B1520' : 'transparent'}`,
+                transition: 'color 0.15s, border-color 0.15s',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Loading skeleton */}
+        {loading && (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-start gap-3 px-3 py-3">
+                <div
+                  className="skeleton-pulse w-8 h-8 rounded-full shrink-0"
+                  style={{ background: 'rgba(255,255,255,0.07)' }}
+                />
+                <div
+                  className="skeleton-pulse w-8 h-8 rounded-full shrink-0"
+                  style={{ background: 'rgba(255,255,255,0.07)' }}
+                />
+                <div className="flex-1 space-y-1.5">
+                  <div
+                    className="skeleton-pulse h-3 w-3/4 rounded"
+                    style={{ background: 'rgba(255,255,255,0.07)' }}
+                  />
+                  <div
+                    className="skeleton-pulse h-2.5 w-1/4 rounded"
+                    style={{ background: 'rgba(255,255,255,0.05)' }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-      </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 mb-5 border-b border-[#E0E0E0] overflow-x-auto scrollbar-hide">
-        {FILTER_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveFilter(tab.key)}
-            className={`px-3 py-2 text-sm font-medium shrink-0 border-b-2 transition-colors -mb-px ${
-              activeFilter === tab.key
-                ? 'border-[#0A0A0A] text-[#0A0A0A]'
-                : 'border-transparent text-[#888888] hover:text-[#404040]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+        {/* Empty state */}
+        {!loading && filtered.length === 0 && (
+          <EmptyState
+            icon={Bell}
+            title="You're all caught up!"
+            description="No notifications yet."
+          />
+        )}
 
-      {/* Loading skeleton */}
-      {loading && (
-        <div className="space-y-2">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex items-start gap-3 px-3 py-3">
-              <Skeleton className="w-8 h-8 rounded-full shrink-0" />
-              <SkeletonAvatar size="sm" />
-              <div className="flex-1 space-y-1.5">
-                <SkeletonText className="w-3/4" />
-                <SkeletonText className="w-1/4" />
+        {/* Notification groups */}
+        {!loading &&
+          groups.map((group) => (
+            <div key={group.label} className="mb-4">
+              <p
+                className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider"
+                style={{ color: 'rgba(245,240,239,0.4)' }}
+              >
+                {group.label}
+              </p>
+              <div
+                className="overflow-hidden rounded-lg"
+                style={{
+                  background: 'rgba(23,18,20,0.65)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}
+              >
+                {group.items.map((notif, idx) => (
+                  <div
+                    key={notif.id}
+                    style={
+                      idx < group.items.length - 1
+                        ? { borderBottom: '1px solid rgba(255,255,255,0.06)' }
+                        : {}
+                    }
+                  >
+                    <NotificationItem
+                      notification={notif}
+                      onClick={handleNotifClick}
+                      onDismiss={handleDismiss}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!loading && filtered.length === 0 && (
-        <EmptyState
-          icon={Bell}
-          title="You're all caught up!"
-          description="No notifications yet."
-        />
-      )}
-
-      {/* Notification groups */}
-      {!loading &&
-        groups.map((group) => (
-          <div key={group.label} className="mb-4">
-            <p className="text-[10px] font-semibold text-[#888888] uppercase tracking-wider px-3 py-1.5">
-              {group.label}
-            </p>
-            <div className="divide-y divide-[#E0E0E0] border border-[#E0E0E0] rounded-lg overflow-hidden">
-              {group.items.map((notif) => (
-                <NotificationItem
-                  key={notif.id}
-                  notification={notif}
-                  onClick={handleNotifClick}
-                  onDismiss={handleDismiss}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-    </div>
+      </div>
+    </>
   );
 }
