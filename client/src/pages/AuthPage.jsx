@@ -8,34 +8,57 @@ import socket from '../socket';
 
 /* ─── Injected CSS ───────────────────────────────────────────────────────────── */
 const AUTH_CSS = `
-  /* Orb drift animations */
-  @keyframes orb1 {
-    0%,100% { transform: translate(0,0) scale(1); }
-    33%  { transform: translate(42px,-28px) scale(1.08); }
-    66%  { transform: translate(-18px,36px) scale(0.93); }
+  /* ── 8 unique orb movement keyframes (alternate direction, 3-4 stops each) ── */
+  @keyframes orbMove1 {
+    0%   { transform: translate(0px,   0px)   scale(1);    }
+    30%  { transform: translate(38px,  -26px)  scale(1.06); }
+    65%  { transform: translate(-22px,  42px)  scale(0.93); }
+    100% { transform: translate(18px,  -14px)  scale(1.1);  }
   }
-  @keyframes orb2 {
-    0%,100% { transform: translate(0,0) scale(1); }
-    25%  { transform: translate(-38px,22px) scale(1.06); }
-    50%  { transform: translate(25px,-42px) scale(0.95); }
-    75%  { transform: translate(-12px,-18px) scale(1.04); }
+  @keyframes orbMove2 {
+    0%   { transform: translate(0px,   0px)   scale(1);    }
+    40%  { transform: translate(-44px,  28px)  scale(0.91); }
+    100% { transform: translate(30px,  -38px)  scale(1.08); }
   }
-  @keyframes orb3 {
-    0%,100% { transform: translate(0,0) scale(1); }
-    40%  { transform: translate(28px,38px) scale(0.91); }
-    70%  { transform: translate(-44px,-22px) scale(1.07); }
+  @keyframes orbMove3 {
+    0%   { transform: translate(0px,   0px)   scale(1);    }
+    25%  { transform: translate(32px,   46px)  scale(1.07); }
+    60%  { transform: translate(-36px,  18px)  scale(0.92); }
+    100% { transform: translate(22px,  -32px)  scale(1.05); }
   }
-  @keyframes orb4 {
-    0%,100% { transform: translate(0,0) scale(1); }
-    30%  { transform: translate(-30px,-40px) scale(1.1); }
-    60%  { transform: translate(35px,15px) scale(0.92); }
+  @keyframes orbMove4 {
+    0%   { transform: translate(0px,   0px)   scale(1);    }
+    50%  { transform: translate(-28px, -44px)  scale(1.1);  }
+    100% { transform: translate(34px,   22px)  scale(0.9);  }
+  }
+  @keyframes orbMove5 {
+    0%   { transform: translate(0px,   0px)   scale(1);    }
+    35%  { transform: translate(48px,   24px)  scale(0.94); }
+    70%  { transform: translate(-32px, -22px)  scale(1.06); }
+    100% { transform: translate(14px,   36px)  scale(0.97); }
+  }
+  @keyframes orbMove6 {
+    0%   { transform: translate(0px,   0px)   scale(1);    }
+    45%  { transform: translate(-38px,  32px)  scale(1.08); }
+    100% { transform: translate(42px,  -28px)  scale(0.92); }
+  }
+  @keyframes orbMove7 {
+    0%   { transform: translate(0px,   0px)   scale(1);    }
+    20%  { transform: translate(26px,  -42px)  scale(1.05); }
+    55%  { transform: translate(-42px,  16px)  scale(0.9);  }
+    100% { transform: translate(20px,   32px)  scale(1.08); }
+  }
+  @keyframes orbMove8 {
+    0%   { transform: translate(0px,   0px)   scale(1);    }
+    60%  { transform: translate(-34px, -38px)  scale(0.93); }
+    100% { transform: translate(38px,   26px)  scale(1.07); }
   }
 
-  /* Grid scroll */
-  @keyframes gridScroll {
-    from { background-position: 0 0; }
-    to   { background-position: 0 60px; }
-  }
+  /* ── 4 opacity pulse keyframes (independent, alternate) ─────────────────── */
+  @keyframes orbPulseA { from { opacity: 0.6;  } to { opacity: 1.0;  } }
+  @keyframes orbPulseB { from { opacity: 0.65; } to { opacity: 0.95; } }
+  @keyframes orbPulseC { from { opacity: 0.55; } to { opacity: 0.9;  } }
+  @keyframes orbPulseD { from { opacity: 0.7;  } to { opacity: 1.0;  } }
 
   /* Card shake on error */
   @keyframes cardShake {
@@ -57,7 +80,7 @@ const AUTH_CSS = `
 
   /* Reduced motion */
   @media (prefers-reduced-motion: reduce) {
-    .auth-orb, .auth-grid { animation: none !important; }
+    .auth-orb { animation: none !important; opacity: 0.8 !important; }
   }
 
   /* Input / select */
@@ -168,16 +191,25 @@ const AUTH_CSS = `
   }
 `;
 
-/* ─── Orb configuration ──────────────────────────────────────────────────────── */
+/* ─── Orb configuration — 8 unique orbs, scattered, never clustered ─────────── */
+// Each orb: own movement keyframe + independent opacity pulse, animation-direction: alternate
 const ORBS = [
-  { w: 220, top: '8%',  left: '3%',  blur: 80, anim: 'orb1', dur: '18s', delay: '0s'  },
-  { w: 150, top: '55%', left: '7%',  blur: 60, anim: 'orb2', dur: '14s', delay: '-3s' },
-  { w: 185, top: '14%', left: '66%', blur: 70, anim: 'orb3', dur: '22s', delay: '-7s' },
-  { w: 100, top: '70%', left: '79%', blur: 50, anim: 'orb4', dur: '10s', delay: '-5s' },
-  { w: 135, top: '38%', left: '88%', blur: 55, anim: 'orb1', dur: '16s', delay: '-2s' },
-  { w: 195, top: '82%', left: '42%', blur: 75, anim: 'orb2', dur: '20s', delay: '-8s' },
-  { w: 88,  top: '4%',  left: '49%', blur: 40, anim: 'orb3', dur: '12s', delay: '-4s' },
-  { w: 165, top: '48%', left: '27%', blur: 65, anim: 'orb4', dur: '15s', delay: '-6s' },
+  // top-left corner
+  { w: 320, top:  '4%', left:  '-5%', blur: 80, move: 'orbMove1', movDur: '18s', movDelay:   '0s', pulse: 'orbPulseA', pulseDur: '24s', pulseDelay:  '-5s' },
+  // top-right corner
+  { w: 240, top:  '2%', left:  '67%', blur: 70, move: 'orbMove2', movDur: '22s', movDelay:  '-4s', pulse: 'orbPulseB', pulseDur: '20s', pulseDelay:  '-8s' },
+  // bottom-left corner
+  { w: 380, top: '75%', left:  '2%',  blur: 90, move: 'orbMove3', movDur: '28s', movDelay:  '-8s', pulse: 'orbPulseC', pulseDur: '30s', pulseDelay:  '-3s' },
+  // bottom-right corner
+  { w: 180, top: '72%', left:  '71%', blur: 60, move: 'orbMove4', movDur: '14s', movDelay:  '-2s', pulse: 'orbPulseD', pulseDur: '18s', pulseDelay: '-12s' },
+  // mid-left edge
+  { w: 280, top: '36%', left:  '-7%', blur: 75, move: 'orbMove5', movDur: '20s', movDelay: '-11s', pulse: 'orbPulseA', pulseDur: '26s', pulseDelay:  '-7s' },
+  // mid-right edge
+  { w: 220, top: '40%', left:  '75%', blur: 65, move: 'orbMove6', movDur: '16s', movDelay:  '-6s', pulse: 'orbPulseB', pulseDur: '22s', pulseDelay: '-15s' },
+  // top-center
+  { w: 350, top:  '-5%', left: '28%', blur: 85, move: 'orbMove7', movDur: '24s', movDelay: '-15s', pulse: 'orbPulseC', pulseDur: '28s', pulseDelay:  '-2s' },
+  // bottom-center
+  { w: 200, top: '80%', left:  '36%', blur: 70, move: 'orbMove8', movDur: '12s', movDelay:  '-3s', pulse: 'orbPulseD', pulseDur: '19s', pulseDelay:  '-9s' },
 ];
 
 /* ─── Shared label style ─────────────────────────────────────────────────────── */
@@ -256,48 +288,45 @@ const EyeClosed = () => (
   </svg>
 );
 
-/* ─── Background scene (fixed, z-index 0) ────────────────────────────────────── */
+/* ─── Background scene ───────────────────────────────────────────────────────── */
 function BackgroundScene() {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none', overflow: 'hidden' }}>
-      {/* Scrolling grid */}
-      <div
-        className="auth-grid"
-        style={{
-          position: 'absolute', inset: 0,
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), ' +
-            'linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)',
-          backgroundSize: '60px 60px',
-          animation: 'gridScroll 10s linear infinite',
-        }}
-      />
+    <>
+      {/* Orb container — fixed, full viewport, behind everything */}
+      <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
+        {ORBS.map((orb, i) => (
+          <div
+            key={i}
+            className="auth-orb"
+            style={{
+              position: 'absolute',
+              width:  orb.w,
+              height: orb.w,
+              top:    orb.top,
+              left:   orb.left,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle at center, rgba(196,30,51,0.18) 0%, rgba(139,21,32,0.08) 50%, transparent 70%)',
+              filter: `blur(${orb.blur}px)`,
+              // Two independent animations: movement + opacity pulse, both alternate
+              animation: [
+                `${orb.move}  ${orb.movDur}   ease-in-out infinite alternate`,
+                `${orb.pulse} ${orb.pulseDur} ease-in-out infinite alternate`,
+              ].join(', '),
+              animationDelay: `${orb.movDelay}, ${orb.pulseDelay}`,
+              willChange: 'transform',
+            }}
+          />
+        ))}
+      </div>
 
-      {/* Floating crimson orbs */}
-      {ORBS.map((orb, i) => (
-        <div
-          key={i}
-          className="auth-orb"
-          style={{
-            position: 'absolute',
-            width: orb.w, height: orb.w,
-            top: orb.top, left: orb.left,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(196,30,51,0.18), transparent 70%)',
-            filter: `blur(${orb.blur}px)`,
-            animation: `${orb.anim} ${orb.dur} ease-in-out infinite`,
-            animationDelay: orb.delay,
-            willChange: 'transform',
-          }}
-        />
-      ))}
-
-      {/* Radial vignette — darkens corners, draws eye to center */}
+      {/* Vignette — sits above orbs, below card (z-index 5) */}
       <div style={{
-        position: 'absolute', inset: 0,
-        background: 'radial-gradient(ellipse 78% 78% at 50% 50%, transparent 32%, rgba(8,6,7,0.78) 100%)',
+        position: 'fixed', inset: 0,
+        background: 'radial-gradient(ellipse at center, transparent 30%, rgba(8,6,7,0.75) 100%)',
+        zIndex: 5,
+        pointerEvents: 'none',
       }} />
-    </div>
+    </>
   );
 }
 
